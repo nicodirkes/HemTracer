@@ -79,7 +79,7 @@ Then the pathlines can be computed using the :func:`hemtracer.PathlineTracker.co
     pathline_tracker.compute_pathlines(x0_list)
 
 
-Computing RBC shear
+Computing hemolysis
 ~~~~~~~~~~~~~~~~~~~
 
 In order to compute the index of hemolysis, we first need to compute the effects of the flow forces on the RBCs. This is done by computing a scalar representative shear rate :math:`G_s` along each pathline (see :ref:`rbc-models` for details). First, we need to choose a model to compute this shear rate:
