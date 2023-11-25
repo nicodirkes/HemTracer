@@ -86,7 +86,7 @@ def main() -> None:
     flow_field.reduce_to_relevant_fields(["velocity", "Geff", "ref_frame"])
 
     # Transform data in moving reference frame.
-    flow_field.transform_mrf_data(rf_name='ref_frame', rf_rot=2, omega=[0, 104.719755, 0], x0=[0,0,0])
+    flow_field.transform_mrf_data(rf_name='ref_frame', rf_rot=2, omega=np.asarray([0, 104.719755, 0]), x0=np.asarray([0,0,0]))
 
     # Compute pathlines.
     pathline_tracker = ht.PathlineTracker(flow_field)
@@ -114,8 +114,9 @@ def main() -> None:
                                        mu = 0.0032, integration_scheme='timeDiff')
 
     models = [model_simp, model_tt, model_tt_corr, model_stress]
-    for model in models:    
-        hemolysis_solver = ht.HemolysisSolver(pathline_tracker)
+
+    hemolysis_solver = ht.HemolysisSolver(pathline_tracker)
+    for model in models:
         hemolysis_solver.compute_representativeShear(model)
         hemolysis_solver.compute_hemolysis(cell_model=model, powerlaw_model=hemolysis_model)
     
