@@ -13,7 +13,7 @@ The recommended way to install is to clone the `GitHub repository <https://githu
     cd HemTracer
     python3 -m pip install .
 
-Note that the package has been tested only with Python 3.12. It may work with older versions, but this is not guaranteed. In addition, the package requires the following dependencies:
+Note that the package requires Python 3.12 due to typing functionality. In addition, the package requires the following dependencies:
 
 - `numpy <https://numpy.org/>`_
 - `scipy <https://www.scipy.org/>`_

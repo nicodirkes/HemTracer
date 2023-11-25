@@ -16,10 +16,9 @@ setup(
     long_description=readme,
     author='Nico Dirkes',
     author_email='dirkes@aices.rwth-aachen.de',
-    # url='',
+    url='nicodirkes.github.io/HemTracer/',
     license=license,
     packages=find_packages(exclude=('tests', 'docs')),
     install_requires=['numpy', 'scipy', 'vtk'],
-    # packages=['hemtracer', 'hemtracer.hemolysis_model', 'hemtracer.rbc_model'],
-    # packages = find_packages(),
+    python_requires='>=3.12',
 )
