@@ -9,7 +9,7 @@ The recommended way to install is to clone the `GitHub repository <https://githu
 
 .. code-block:: bash
 
-    git clone
+    git clone https://github.com/nicodirkes/HemTracer.git
     cd HemTracer
     python3 -m pip install .
 
