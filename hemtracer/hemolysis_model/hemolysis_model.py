@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import namedtuple
 from collections.abc import Callable
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from enum import Enum
 
 
@@ -35,42 +35,42 @@ class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
     """
 
-    _hemolysis_correlation: IHCorrelation = None  
+    _hemolysis_correlation: IHCorrelation
     """
     Power law coefficients to use.
     """
 
-    _corr_name: str = None  
+    _corr_name: str
     """
     Name of correlation used.
     """
 
-    _mu: float = None  
+    _mu: float
     """
     Dynamic viscosity of blood.
     """
 
-    _C: float = None  
+    _C: float
     r"""
     Coefficient C for hemolysis correlation :math:`HI = C t^\alpha \sigma^\beta`. This corresponds to the definition in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. The internal values of this class are thus different from the definitions in :class:`HemolysisCorrelation`, i.e., :math:`C = A_\mathrm{Hb}, \, \alpha = \beta_\mathrm{Hb}, \, \beta = \alpha_\mathrm{Hb}`. This is to allow for direct comparison of the numerical schemes with the formulations in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`.
     """
 
-    _alpha: float = None  
+    _alpha: float
     """
     Coefficient alpha in hemolysis correlation.
     """
 
-    _beta: float = None  
+    _beta: float
     """
     Coefficient beta in hemolysis correlation.
     """
 
-    _integration_scheme_name: str = None  
+    _integration_scheme_name: str
     """
     Name of scheme used to numerically integrate hemolysis correlation.
     """
 
-    _compute_IH: Callable[[ArrayLike, ArrayLike], ArrayLike] = None  
+    _compute_IH: Callable[[NDArray, NDArray], NDArray]
     """
     Function that computes hemolysis index from time and scalar shear rate using the desired integration scheme.
     """
@@ -111,28 +111,28 @@ class PowerLawModel:
             case _:
                 raise ValueError('Unknown integration scheme.')
     
-    def compute_hemolysis(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def compute_hemolysis(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Compute hemolysis along pathline. Called by :class:`HemolysisSolver`.
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         return self._compute_IH(t, G)
     
-    def _compute_HI1(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def _compute_HI1(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Computes index of hemolysis by directly integrating experimental correlation.
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
@@ -146,14 +146,14 @@ class PowerLawModel:
 
         return IH
     
-    def _compute_HI2(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def _compute_HI2(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Computes index of hemolysis by incorporating time derivative in experimental correlation.
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
@@ -167,14 +167,14 @@ class PowerLawModel:
 
         return IH
 
-    def _compute_HI3(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def _compute_HI3(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Computes index of hemolysis by summing linearized damage.
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
@@ -190,14 +190,14 @@ class PowerLawModel:
 
         return IH
     
-    def _compute_HI4(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def _compute_HI4(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Computes index of hemolysis by accumulating mechanical dose (Grigioni et al. :cite:p:`grigioniNovelFormulationBlood2005`).
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
@@ -214,14 +214,14 @@ class PowerLawModel:
 
         return IH
     
-    def _compute_HI5(self, t: ArrayLike, G: ArrayLike) -> NDArray:
+    def _compute_HI5(self, t: NDArray, G: NDArray) -> NDArray:
         """
         Computes index of hemolysis by using virtual time step approach (Goubergrits and Affeld :cite:p:`goubergritsNumericalEstimationBlood2004`).
 
         :param t: Time steps.
-        :type t: ArrayLike
+        :type t: NDArray
         :param G: Scalar shear rate.
-        :type G: ArrayLike
+        :type G: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """

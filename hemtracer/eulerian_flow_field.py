@@ -13,52 +13,47 @@ class EulerianFlowField:
     A class that represents a steady flow field in Eulerian coordinates with various field data. Unsteady flow fields are currently only supported in the form of MRF data. The mesh has to be unstructured and non-moving and the flow field has to be defined as node-centered velocity field (point data in VTK). The flow field is represented by a VTK file. It has to contain a velocity field. Additional field data, e.g., an Eulerian hemolysis solution, can be imported from other VTK files using the import_field_data method. The class provides functionality to interpolate field data to pathlines.
     """
 
-    _vtk_flow_field_name: str = None  
+    _vtk_flow_field_name: str
     """
     Name of the VTK file containing the flow field.
     """
 
-    _vtk_flow_field_reader: vtkUnstructuredGridReader = None  
+    _vtk_flow_field: vtkUnstructuredGrid
     """
-    VTK reader for the flow field.
-    """
-
-    _vtk_flow_field: vtkUnstructuredGrid = None  
-    """
-    VTK flow field.
+    VTK flow field object.
     """
 
-    _velocity_name: str = "velocity"  
+    _velocity_name: str = "velocity"
     """
     Name of the velocity field in the VTK file. Defaults to "velocity".
     Assume that the velocity field is called "velocity" in the VTK file.
     """
 
-    _velocity_gradient_name: str = None  
+    _velocity_gradient_name: str | None = None  
     """
     Name of the velocity gradient field in the VTK file.
     Assume that no gradient has been computed yet.
     """
 
-    _mrf_velocity_name: str = None  
+    _mrf_velocity_name: str | None = None  
     """
     Name of the MRF velocity field in the VTK file.
     Assume that no MRF velocity has been computed yet.
     """
 
-    _mrf_omega_name: str = None  
+    _mrf_omega_name: str | None = None  
     """
     Name of the angular velocity of the rotating frame of reference in the VTK file.
     Computed as part of MRF transformation.
     """
 
-    _mrf_r_name: str = None  
+    _mrf_r_name: str | None = None  
     """
     Name of the orthogonal distance from the rotation axis in the VTK file.
     Computed as part of MRF transformation.
     """
 
-    _interpolator: vtkProbeFilter = None  
+    _interpolator: vtkProbeFilter | None = None  
     """
     Field interpolator (may be used to extract cell data along pathline).
     """
@@ -73,10 +68,10 @@ class EulerianFlowField:
 
         # Read VTK file.
         self._vtk_flow_field_name = vtk_filename
-        self._vtk_flow_field_reader = vtkUnstructuredGridReader()
-        self._vtk_flow_field_reader.SetFileName(self._vtk_flow_field_name)
-        self._vtk_flow_field_reader.Update()
-        self._vtk_flow_field = self._vtk_flow_field_reader.GetOutput()
+        _vtk_flow_field_reader = vtkUnstructuredGridReader()
+        _vtk_flow_field_reader.SetFileName(self._vtk_flow_field_name)
+        _vtk_flow_field_reader.Update()
+        self._vtk_flow_field = _vtk_flow_field_reader.GetOutput()
 
     def set_velocity_name(self, vtk_velocity_name: str) -> None:
         """
@@ -113,7 +108,7 @@ class EulerianFlowField:
                 raise ValueError("Velocity gradient field {} not found in {}".format(self._velocity_gradient_name, self._vtk_flow_field_name))
 
     def import_field_data(self, vtk_file_name: str, 
-                          field_names_point: List[str] = None, field_names_cell: List[str] = None) -> None:
+                          field_names_point: List[str] | None = None, field_names_cell: List[str] | None = None) -> None:
         """
         Import additional field data from a VTK file (to be interpolated to the streamlines).
         The field data has to be defined on the same mesh as the flow field.
@@ -332,7 +327,7 @@ class EulerianFlowField:
         self._interpolator.Update()
 
         # Start dictionary with interpolated values and positions x.
-        interp_values = { 'x' : x }
+        interp_values = { 'x' : np.asarray(x) }
 
         # Find field either in cell values or point values and add to interp_values dict.
         for field_name in field_names:
@@ -412,7 +407,7 @@ class EulerianFlowField:
         else:
             return self._velocity_name
 
-    def get_name_velocity_gradient(self) -> str:
+    def get_name_velocity_gradient(self) -> str | None:
         """
         Get the name of the velocity gradient field. If no velocity gradient has been computed, this is None.
 
@@ -421,7 +416,7 @@ class EulerianFlowField:
         """
         return self._velocity_gradient_name
     
-    def get_name_omega_frame(self) -> str:
+    def get_name_omega_frame(self) -> str | None:
         """
         Get the name of the angular velocity of the rotating frame of reference. If no rotating frame of reference has been defined, this is None.
 
@@ -430,7 +425,7 @@ class EulerianFlowField:
         """
         return self._mrf_omega_name
     
-    def get_name_distance_center(self) -> str:
+    def get_name_distance_center(self) -> str | None:
         """
         Get the name of the orthogonal distance from the rotation axis. If no rotating frame of reference has been defined, this is None.
 

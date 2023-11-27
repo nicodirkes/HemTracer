@@ -3,34 +3,34 @@ from hemtracer.rbc_model import RBCModel
 from hemtracer.hemolysis_model import PowerLawModel
 from hemtracer.pathlines import PathlineTracker
 from typing import List, Dict
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 class HemolysisSolver:
     """
     Class for computing hemolysis along pathlines. Takes an existing pathline tracker and handles the various pathlines contained within, interfacing to the hemolysis models.
     """
 
-    _pathline_tracker: PathlineTracker = None  
+    _pathline_tracker: PathlineTracker  
     """
     Pathline tracker object.
     """
 
-    _v_name: str = None  
+    _v_name: str
     """
     Name of velocity attribute on pathlines.
     """
 
-    _dv_name: str = None  
+    _dv_name: str | None = None  
     """
     Name of velocity gradient attribute on pathlines.
     """
 
-    _omega_name: str = None  
+    _omega_name: str | None = None  
     """
     Name of angular velocity attribute on pathlines.
     """
 
-    _r_name: str = None  
+    _r_name: str | None = None  
     """
     Name of orthogonal distance to center of rotation attribute on pathlines.
     """
@@ -145,14 +145,14 @@ class HemolysisSolver:
         index_of_hemolysis_name = 'IH'
         return index_of_hemolysis_name + '_' + powerlaw_model.get_name() + '_' + cell_model.get_name()
     
-    def get_representativeShear(self, model: RBCModel) -> List[Dict[str, ArrayLike]]:
+    def get_representativeShear(self, model: RBCModel) -> List[Dict[str, NDArray]]:
         """
         Obtain representative scalar shear rate along pathlines after it has been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
 
         :param model: Cell model to use.
         :type model: RBCModel
         :return: List of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
-        :rtype: List[Dict[str, ArrayLike]]
+        :rtype: List[Dict[str, NDArray]]
         """
 
         return self._pathline_tracker.get_attribute(self._get_attribute_name_representativeShear(model))

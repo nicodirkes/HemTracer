@@ -114,7 +114,7 @@ class Frobenius(StressBasedModel):
         """
 
         G = np.linalg.norm(E, ord='fro')
-        return G
+        return float(G)
 
 class SecondInvariant(StressBasedModel):
     r"""

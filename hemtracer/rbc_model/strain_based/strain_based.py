@@ -1,7 +1,8 @@
 from hemtracer.rbc_model import RBCModel
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 from scipy.integrate import solve_ivp
 from hemtracer._definitions import Vector3, Vector9, Vector12, Tensor3
+from collections.abc import Callable
 from collections import namedtuple
 from enum import Enum
 import numpy as np
@@ -29,37 +30,37 @@ class StrainBasedModel(RBCModel):
     """Represents a strain-based blood damage model. These models employ a differential equation to explicitly resolve cell deformation in response to the acting flow forces. In the current implementation, this is constructed in particular for the Arora model (Arora et al. 2004) and all models derived from it, i.e., the simplified Eulerian model :cite:t:`pauli_transient_2013`, the full Eulerian morphology model (Dirkes et al. 2023) and the tank-treading model (Dirkes et al. 2023). In theory, however, also other strain-based models could be implemented as sub-classes. Since an ODE solver is required, these models offer additional configuration options for the solver and the initial condition.
     """
 
-    _initial_condition: ArrayLike = None  
+    _initial_condition: NDArray
     """
     Initial condition for solution variable, i.e., shape of cells at the start of pathline integration.
     """
 
-    _method: str = None  
+    _method: str
     """
     Method for ODE solver.
     """
 
-    _atol: float = None  
+    _atol: float
     """
     Absolute tolerance for ODE solver.
     """
 
-    _rtol: float = None  
+    _rtol: float
     """
     Relative tolerance for ODE solver.
     """
 
-    _first_step: float = None  
+    _first_step: float
     """
     Initial step size for ODE solver.
     """
 
-    _max_step: float = None  
+    _max_step: float
     """
     Maximum step size for ODE solver.
     """
 
-    _coeffs = MorphologyModelCoefficients.ARORA
+    _coeffs: MorphologyModelCoefficients = MorphologyModelCoefficients.ARORA
     """
     Coefficients for morphology model.
     """
@@ -123,14 +124,14 @@ class StrainBasedModel(RBCModel):
         self._first_step = first_step
         self._max_step = max_step
 
-    def compute_representative_shear(self) -> Tuple[ArrayLike, ArrayLike]:
+    def compute_representative_shear(self) -> Tuple[NDArray, NDArray]:
         """
         Solve strain-based model, return effective shear rate and chosen time steps.
         Called by :class:`hemtracer.hemolysis_solver.HemolysisSolver`.
 
         :meta private:
         :return: Time steps and Effective shear rate.
-        :rtype: Tuple[ArrayLike, ArrayLike]
+        :rtype: Tuple[NDArray, NDArray]
         """
 
         result = solve_ivp(self._RHS, (self._t0, self._tend), self._initial_condition, method=self._method, atol=self._atol, rtol=self._rtol, first_step=self._first_step, max_step=self._max_step)
@@ -140,49 +141,49 @@ class StrainBasedModel(RBCModel):
 
         return (t, Geff)
 
-    def _initial_condition_undeformed(self) -> ArrayLike:
+    def _initial_condition_undeformed(self) -> NDArray:
         """
         Set initial condition for undeformed cells. This is the default initial condition for all strain-based models. Has to be implemented by subclasses to be usable.
 
         :return: A vector of values describing an undeformed cell in the model.
-        :rtype: ArrayLike
+        :rtype: NDArray
         :raises NotImplementedError: If undeformed initial condition is not implemented in this cell model.
         """
 
         raise NotImplementedError('Undeformed initial condition not implemented in this cell model.')
     
-    def _initial_condition_steady(self) -> ArrayLike:
+    def _initial_condition_steady(self) -> NDArray:
         """
         Set initial condition for steady shear. Has to be implemented by subclasses to be usable.
 
         :return: A vector of values describing a cell in steady shear in the model.
-        :rtype: ArrayLike
+        :rtype: NDArray
         :raises NotImplementedError: If steady shear initial condition is not implemented in this cell model.
         """
 
         raise NotImplementedError('Steady shear initial condition not implemented in this cell model.')
     
-    def _compute_Geff_from_sol(self, sol: ArrayLike) -> ArrayLike:
+    def _compute_Geff_from_sol(self, sol: NDArray) -> NDArray:
         """
         Compute effective shear rate from solution of strain-based model.
 
         :param sol: Solution of strain-based model.
-        :type sol: ArrayLike (n x ndf)
+        :type sol: NDArray (n x ndf)
         :return: Effective shear rate.
-        :rtype: ArrayLike (n x 1)
+        :rtype: NDArray (n x 1)
         :raises NotImplementedError: If effective shear rate computation is not implemented in subclasses.
         """
 
         raise NotImplementedError('Effective shear rate computation has to be implemented in subclasses.')
 
-    def _compute_D_from_eig(self, lam: ArrayLike) -> ArrayLike:
+    def _compute_D_from_eig(self, lam: NDArray) -> NDArray:
         """
         Compute cell distortion D = (L-B)/(L+B) from eigenvalues of morphology tensor.
 
         :param lam: Nodal morphology eigenvalues lambda.
-        :type lam: ArrayLike (n x 3)
+        :type lam: NDArray (n x 3)
         :return: Nodal cell distortion values.
-        :rtype: ArrayLike (n x 1)
+        :rtype: NDArray (n x 1)
         """
 
         lambSqrt = np.sqrt(lam)
@@ -191,14 +192,14 @@ class StrainBasedModel(RBCModel):
         D = np.divide(L-B,L+B)
         return D
     
-    def _compute_Geff_from_D(self, D: ArrayLike) -> ArrayLike:
+    def _compute_Geff_from_D(self, D: NDArray) -> NDArray:
         """
         Compute effective strain rate G_eff from cell distortion D.
 
         :param D: Nodal cell distortion values.
-        :type D: ArrayLike
+        :type D: NDArray
         :return: Solution field for effective shear rate.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         f1 = self._coeffs.f1
@@ -235,16 +236,16 @@ class StrainBasedModel(RBCModel):
 
         return np.array([[0, -vec[2], vec[1]], [vec[2], 0, -vec[0]], [-vec[1], vec[0], 0]])
     
-    def _RHS(self, t: float, y: ArrayLike) -> ArrayLike:
+    def _RHS(self, t: float, y: NDArray) -> NDArray:
         """
         Right-hand side of ODE for strain-based model. Has to be implemented for each strain-based model.
 
         :param t: Time.
         :type t: float
         :param y: Current state.
-        :type y: ArrayLike
+        :type y: NDArray
         :return: Right-hand side of ODE.
-        :rtype: ArrayLike
+        :rtype: NDArray
         :raises NotImplementedError: If RHS is not implemented in subclasses.
         """
 
@@ -296,14 +297,14 @@ class StrainBasedModel(RBCModel):
 class MorphologyTensorFormulation(StrainBasedModel):
     """Abstract base class that represents any morphology model derived from the Arora model that uses the morphology tensor :code:`S = [S_11, S_22, S_33, S_12, S_13, S_23]` as solution variable."""
 
-    def _compute_eig_from_morph(self, S: ArrayLike) -> ArrayLike:
+    def _compute_eig_from_morph(self, S: NDArray) -> NDArray:
         """
         Compute eigenvalues of morphology tensor.
 
         :param S: Morphology tensor solution, assumed to be written as vector in form [S_11, S_22, S_33, S_12, S_13, S_23].
-        :type S: ArrayLike
+        :type S: NDArray
         :return: Eigenvalues at nodes.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         if np.shape(S)[1] == 3:     # 2D -- simple formula
@@ -329,14 +330,14 @@ class MorphologyTensorFormulation(StrainBasedModel):
 
         return lam
 
-    def _pack_morphology(self, S: ArrayLike) -> ArrayLike:
+    def _pack_morphology(self, S: NDArray) -> NDArray:
         """
         Pack values from symmetric morphology tensor into vector.
 
         :param S: Symmetric morphology tensor.
-        :type S: ArrayLike
+        :type S: NDArray
         :return: Vector of morphology tensor values.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         morph_vec = np.zeros((6,))
@@ -348,12 +349,12 @@ class MorphologyTensorFormulation(StrainBasedModel):
         morph_vec[5] = S[1, 2]
         return morph_vec
     
-    def _unpack_morphology(self, morph_vec: ArrayLike) -> Tensor3:
+    def _unpack_morphology(self, morph_vec: NDArray) -> Tensor3:
         """
         Unpack values from vector into symmetric morphology tensor.
 
         :param morph_vec: Vector of morphology tensor values.
-        :type morph_vec: ArrayLike
+        :type morph_vec: NDArray
         :return: Symmetric morphology tensor.
         :rtype: Tensor3
         """
@@ -370,36 +371,36 @@ class MorphologyTensorFormulation(StrainBasedModel):
         S[2, 1] = morph_vec[5]
         return S
 
-    def _initial_condition_undeformed(self) -> ArrayLike:
+    def _initial_condition_undeformed(self) -> NDArray:
         """
         Set initial condition for undeformed cells in morphology tensor models, i.e., S = I.
 
         :return: Initial condition for undeformed cells.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         return np.array([1, 1, 1, 0, 0, 0])
     
-    def _initial_condition_steady(self) -> ArrayLike:
+    def _initial_condition_steady(self) -> NDArray:
         """
         Set initial condition for steady shear in morphology tensor models.
 
         :return: Initial condition for steady shear.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         lamb, Q = self._compute_steady_state_shear(self._t0)
         S = np.matmul(Q, np.matmul(np.diag(lamb), Q.T)) # S = Q * lambda * Q^T (eigendecomposition)
         return self._pack_morphology(S)
     
-    def _compute_Geff_from_sol(self, sol: ArrayLike) -> ArrayLike:
+    def _compute_Geff_from_sol(self, sol: NDArray) -> NDArray:
         """
         Compute effective shear rate from solution of morphology tensor model.
 
         :param sol: Solution of morphology tensor model, assumed to be written as vector in form [S_11, S_22, S_33, S_12, S_13, S_23].
-        :type sol: ArrayLike (n x 6)
+        :type sol: NDArray (n x 6)
         :return: Effective shear rate.
-        :rtype: ArrayLike (n x 1)
+        :rtype: NDArray (n x 1)
         """
 
         lam = self._compute_eig_from_morph(sol)
@@ -463,16 +464,16 @@ class AroraSimplified(MorphologyTensorFormulation):
         """
         return 'simplified-arora'
     
-    def _RHS(self, t: float, y: ArrayLike) -> ArrayLike:
+    def _RHS(self, t: float, y: NDArray) -> NDArray:
         """
         Compute the right-hand side of the ODE for the cell model.
 
         :param t: Time.
         :type t: float
         :param y: Current state.
-        :type y: ArrayLike
+        :type y: NDArray
         :return: Right-hand side of the ODE.
-        :rtype: ArrayLike
+        :rtype: NDArray
         """
 
         E, W, Om = self._compute_strain_vort_rot(t)
@@ -496,14 +497,14 @@ class AroraSimplified(MorphologyTensorFormulation):
 class MorphologyEigFormulation(StrainBasedModel):
     r"""Abstract superclass for all morphology models derived from the Arora model that employ a formulation explicit in the eigenvalues :math:`(\lambda_1, \lambda_2, \lambda_3)`"""
 
-    def _compute_Geff_from_sol(self, sol: ArrayLike) -> ArrayLike:
+    def _compute_Geff_from_sol(self, sol: NDArray) -> NDArray:
         r"""
         Compute effective shear rate from solution of strain-based model.
 
         :param sol: Solution of strain-based model, assumed to be written as vector in form :math:`(\lambda_1, \lambda_2, \lambda_3, \dots)`.
-        :type sol: ArrayLike (n x ndf)
+        :type sol: NDArray (n x ndf)
         :return: Effective shear rate.
-        :rtype: ArrayLike (n x 1)
+        :rtype: NDArray (n x 1)
         """
 
         lam = sol[:,:3] # eigenvalues are first three entries
@@ -721,7 +722,7 @@ class TankTreading(MorphologyEigFormulation):
         return f
     
     def _getSteadyOrientation2D(self, Eii: float, Eij: float, Ejj: float, 
-                                Wij: float, li: float, lj: float) -> Tuple[float, bool]:
+                                Wij: float, li: float, lj: float) -> float | None:
         """
         Computes the steady orientation for a 2D ellipse.
 
@@ -738,7 +739,7 @@ class TankTreading(MorphologyEigFormulation):
         :param lj: Other eigenvalue of morphology tensor.
         :type lj: float
         :return: Angle for steady orientation. None, if no steady orientation exists.
-        :rtype: Tuple[float, bool]
+        :rtype: float | None
         """
         
         tol = 1e-7
@@ -893,6 +894,18 @@ class TankTreadingRotationCorrection(TankTreading):
     Represents the tank-treading model (Dirkes et al. 2023) with a correction term for cell rotation along the pathline. This model is still experimental and not yet published.
     """
 
+    _x: Callable[[float], Vector3]  
+    """
+    Relevant position measure as a function of pathline time, e.g., absolute coordinates 
+    or distance from rotational center (required only for tank-treading with pathline correction).
+    """
+
+    _v: Callable[[float], Vector3]
+    """
+    Velocity as a function of pathline time 
+    (required only for tank-treading with pathline correction).
+    """
+
     def get_name(self) -> str:
         """
         Get name of blood damage model.
@@ -903,28 +916,46 @@ class TankTreadingRotationCorrection(TankTreading):
 
         return 'tank-treading-pathline'
     
-    def _check_completeness(self) -> None:
+    def set_time_dependent_quantitites(self, t0: float, tend: float, dv: Callable[[float], Vector9] | None = None, omega: Callable[[float], Vector3] | None = None, x: Callable[[float], Vector3] | None = None, v: Callable[[float], Vector3] | None = None) -> None:
         """
-        Check if all required quantities are defined. Overrides _check_completeness from superclass to include checks for x and v.
+        Set time-dependent quantities for the cell model. Overrides superclass method to include position measure x and velocity v.
+
+        :param t0: Start time.
+        :type t0: float
+        :param tend: End time.
+        :type tend: float
+        :param dv: Time-dependent velocity gradient dv/dt.
+        :type dv: Callable[[float], Vector9]
+        :param omega: Time-dependent angular velocity.
+        :type omega: Callable[[float], Vector3]
+        :param x: Time-dependent position measure, e.g., absolute coordinates or distance from rotational center. 
+        :type x: Callable[[float], Vector3]
+        :param v: Time-dependent velocity.
+        :type v: Callable[[float], Vector3
+        :raises ValueError: If position measure x or velocity v is not provided.
         """
-
-        super()._check_completeness()
-
-        # Check if x and v are defined.
-        if self._x is None:
-            raise AttributeError('Distance from center of rotation not available.')
         
-        if self._v is None:
-            raise AttributeError('Velocity not available.')
+        # Set same quantities as superclass.
+        super().set_time_dependent_quantitites(t0, tend, dv, omega, x, v)
 
-    def _compute_strain_vort_rot(self, t: float) -> Tuple[ArrayLike, ArrayLike]:
+        # Additionally set position measure and velocity.
+        if x is None:
+            raise ValueError('Position measure x is required for tank-treading with pathline correction.')
+        
+        if v is None:
+            raise ValueError('Velocity v is required for tank-treading with pathline correction.')
+        
+        self._x = x
+        self._v = v
+
+    def _compute_strain_vort_rot(self, t: float) -> Tuple[NDArray, NDArray, NDArray]:
         """
         Overrides _compute_strain_vort_rot from superclass to include correction term for cell rotation along the pathline.
 
         :param t: Time.
         :type t: float
         :return: Strain tensor, Vorticity tensor, Angular velocity of frame of reference, including correction term.
-        :rtype: Tuple[ArrayLike, ArrayLike]
+        :rtype: Tuple[NDArray, NDArray, NDArray]
         """
 
         # Compute correction term.

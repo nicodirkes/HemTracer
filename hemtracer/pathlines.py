@@ -4,7 +4,7 @@ from vtk import vtkStreamTracer
 from scipy.interpolate import interp1d
 import numpy as np
 from typing import List, Dict, Any
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from hemtracer._definitions import Vector3, vtk_point_assoc
 from collections.abc import Callable
 
@@ -15,22 +15,22 @@ class PathlineAttribute:
     """Class for storing a quantity of interest along a pathline. The data is stored as a function of the integration time. All class attributes are meant to be publicly accessible.
     """
 
-    t: ArrayLike = None  
+    t: NDArray
     """
     The integration times along the pathline at which the values are stored.
     """
 
-    val: ArrayLike = None  
+    val: NDArray
     """
     The values of the quantity of interest along the pathline.
     """
 
-    name: str = None  
+    name: str
     """
     The name of the quantity of interest.
     """
 
-    interpolator: Callable[[float], Any] = None  
+    interpolator: interp1d
     """
     A function that interpolates the values along the pathline.
     """
@@ -47,8 +47,8 @@ class PathlineAttribute:
         :type interpolation_scheme: str
         """
 
-        self.t = t
-        self.val = val
+        self.t = np.asarray(t)
+        self.val = np.asarray(val)
         self.name = name
         self.interpolator = interp1d(self.t, self.val, axis=0, kind=interpolation_scheme)
 
@@ -57,17 +57,17 @@ class Pathline:
     Class representing a single pathline as a collection of PathlineAttribute objects. Every pathline has an attribute 'Position', which is stored by default as definition of the pathline. Additional attributes can be added using the add_attribute function.
     """
 
-    _attributes: List[PathlineAttribute] = None  
+    _attributes: List[PathlineAttribute]
     """
     A list of PathlineAttribute objects.
     """
 
-    _t0: float = None  
+    _t0: float
     """
     The initial integration time of the pathline.
     """
 
-    _tend: float = None  
+    _tend: float
     """
     The final integration time of the pathline.
     """
@@ -90,7 +90,7 @@ class Pathline:
         
         self._attributes = [ PathlineAttribute(t, x, 'Position') ]
 
-    def get_attribute(self, name: str) -> PathlineAttribute:
+    def get_attribute(self, name: str) -> PathlineAttribute|None:
         """
         Returns the attribute with the specified name. Returns None if no attribute with the specified name exists.
 
@@ -116,11 +116,14 @@ class Pathline:
 
         return [ attribute.name for attribute in self._attributes ]
     
-    def get_attribute_interpolator(self, attribute_name: str) -> interp1d:
+    def get_attribute_interpolator(self, attribute_name: str|None) -> interp1d|None:
         """
         Returns interpolator for attribute on pathline, or None if it does not exist.
-        Arguments:
-        attribute_name : string indicating name of attribute
+
+        :param attribute_name: string indicating name of attribute
+        :type attribute_name: str|None
+        :return: interpolator for attribute on pathline, or None if it does not exist
+        :rtype: interp1d|None
         """
 
         if attribute_name is None:
@@ -179,17 +182,17 @@ class PathlineTracker:
     Class for tracking pathlines in a flow field. Uses VTK's vtkStreamTracer to compute pathlines. Stores pathlines as :class:`Pathline` objects. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the :func:`interpolate_to_pathlines` function.
     """
 
-    _velocity_name: str = None  
+    _velocity_name: str
     """
     The name of the velocity field to use for pathline integration.
     """
 
-    _flow_field: EulerianFlowField = None  
+    _flow_field: EulerianFlowField
     """
     The EulerianFlowField object in which to track pathlines.
     """
 
-    _pathlines: List[Pathline] = []  
+    _pathlines: List[Pathline] = []
     """
     A list of Pathline objects, empty if none have been computed yet.
     """
@@ -210,7 +213,7 @@ class PathlineTracker:
     
     def compute_pathlines(self, x0: List[Vector3], 
                           initial_step: float = 0.001, min_step: float = 0.001, max_step: float = 0.002, 
-                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: float = 100000) -> None:
+                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000) -> None:
         """
         Compute pathlines starting from a list of initial points. Stores pathlines in internal list. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the interpolate_to_pathlines function.
 
@@ -239,7 +242,7 @@ class PathlineTracker:
             tracer.SetInputData(self._flow_field.get_vtk_flow_field())
             tracer.SetInputArrayToProcess(0, 0, 0, vtk_point_assoc, self._velocity_name)
             tracer.SetInterpolatorTypeToDataSetPointLocator()
-            tracer.SetStartPosition(x0_i)
+            tracer.SetStartPosition(tuple(x0_i))
             tracer.SetIntegrationDirectionToForward()
             tracer.SetMaximumPropagation(max_length)
             tracer.SetMaximumIntegrationStep(max_step)
@@ -257,7 +260,7 @@ class PathlineTracker:
             t_np = np.array(point_data.GetArray(integration_time_name), copy=True)
 
             # Store results in Pathline object.
-            pl = Pathline(t_np, points_np)
+            pl = Pathline(list(t_np), list(points_np))
 
             # Additionally store interpolated field data and integration time.
             for j in range(point_data.GetNumberOfArrays()):
@@ -284,6 +287,9 @@ class PathlineTracker:
             self._flow_field.compute_gradients()
             velocity_gradient_name = self._flow_field.get_name_velocity_gradient()
         
+        if velocity_gradient_name is None:
+            raise AttributeError("Velocity gradient could not be computed.")
+        
         # Interpolate velocity gradient.
         self.interpolate_to_pathlines([velocity_gradient_name], 
                                       sampling_rate=sampling_rate, interpolation_scheme=interpolation_scheme)
@@ -306,13 +312,19 @@ class PathlineTracker:
         for pathline in self._pathlines:
 
             # Get integration times and interpolator.
-            t = pathline.get_attribute('Position').t
-            x_interp = pathline.get_attribute('Position').interpolator
+            position_attribute = pathline.get_attribute('Position')
+            if position_attribute is None:
+                raise AttributeError("No position attribute found on pathline.")
+            else:
+                t = position_attribute.t
+                x_interp = position_attribute.interpolator
 
             # Determine time points at which to interpolate.
             if sampling_rate > 0:
-                n_samples = int((t[-1]-t[0])/sampling_rate)+1
-                ti = np.linspace(t[0], t[-1], n_samples, endpoint=True)
+                t0 = t[0]
+                tend = t[-1]
+                n_samples = int((tend-t0)/sampling_rate)+1
+                ti = np.linspace(t0, tend, n_samples, endpoint=True)
             else:
                 ti = t
 
@@ -347,14 +359,14 @@ class PathlineTracker:
 
         return self._flow_field
 
-    def get_attribute(self, attribute_name: str) -> List[Dict[str, ArrayLike]]:
+    def get_attribute(self, attribute_name: str) -> List[Dict[str, NDArray]]:
         """
         Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and attribute, respectively.
 
         :param attribute_name: The name of the attribute to return.
         :type attribute: str
         :return: A list of dictionaries.
-        :rtype: List[Dict[str, ArrayLike]]
+        :rtype: List[Dict[str, NDArray]]
         """
 
         dict_list = []
@@ -376,7 +388,7 @@ class PathlineTracker:
 
         return self._velocity_name
     
-    def get_name_velocity_gradient(self) -> str:
+    def get_name_velocity_gradient(self) -> str | None:
         """
         Returns the name of the attribute that contains the velocity gradient. Implemented by asking the flow field.
 
@@ -386,7 +398,7 @@ class PathlineTracker:
 
         return self._flow_field.get_name_velocity_gradient()
     
-    def get_name_omega_frame(self) -> str:
+    def get_name_omega_frame(self) -> str | None:
         """
         Returns the name of the attribute that describes the angular velocity vector of the frame of reference. Implemented by asking the flow field.
 
@@ -396,7 +408,7 @@ class PathlineTracker:
 
         return self._flow_field.get_name_omega_frame()
     
-    def get_name_distance_center(self) -> str:
+    def get_name_distance_center(self) -> str | None:
         """
         Returns the name of the attribute that describes the orthogonal distance to the center of rotation. Implemented by asking the flow field.
 

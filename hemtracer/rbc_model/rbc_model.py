@@ -10,45 +10,33 @@ class RBCModel:
     """Abstract base class for any model that computes a scalar shear rate along a pathline. These models assume a certain red blood cell (RBC) behavior, hence the name RBC Model. They can be categorized into two groups: stress-based and strain-based models. Stress-based models assume direct deformation of the cell in response to stress, reducing the instantaneous three-dimensional local fluid strain to a representative scalar shear rate. Strain-based models take into account the characteristic membrane relaxation time, employing a differential equation to explicitly resolve cell deformation in response to the acting flow forces. They then compute a scalar shear rate (so-called effective shear) from cell deformation.
     """
 
-    _t0: float = None  
+    _t0: float  
     """
     Start time.
     """
 
-    _tend: float = None  
+    _tend: float
     """
     End time.
     """
 
-    _dv: Callable[[float], Vector9] = None  
+    _dv: Callable[[float], Vector9]
     """
     Velocity gradient tensor (in vector form) as a function of pathline time 
     (required for all currently implemented models).
     """
 
-    _omega: Callable[[float], Vector3] = None  
+    _omega: Callable[[float], Vector3]
     """
     MRF angular velocity vector as a function of pathline time 
     (required for all currently implemented models except stress-based bludszuweit).
     """
 
-    _x: Callable[[float], Vector3] = None  
-    """
-    Relevant position measure as a function of pathline time, e.g., absolute coordinates 
-    or distance from rotational center (required only for tank-treading with pathline correction).
-    """
-
-    _v: Callable[[float], Vector3] = None  
-    """
-    Velocity as a function of pathline time 
-    (required only for tank-treading with pathline correction).
-    """
-
     def set_time_dependent_quantitites(self, t0: float, tend: float, 
-                                       dv: Callable[[float],Vector9] = None, 
-                                       omega: Callable[[float],Vector3] = None, 
-                                       x: Callable[[float], Vector3] = None,
-                                       v: Callable[[float], Vector3] = None) -> None:
+                                       dv: Callable[[float],Vector9] | None = None, 
+                                       omega: Callable[[float],Vector3] | None = None, 
+                                       x: Callable[[float], Vector3] | None = None,
+                                       v: Callable[[float], Vector3] | None = None) -> None:
         """
         Set time-dependent quantities for scalar shear rate model and check if all required quantities are there. Start and end time as well as velocity gradient are always required. If omega is not defined, it is set to zero, assuming a stationary frame of reference. The tank-treading model with pathline additionally requires x and v. This is handled by :class:`hemtracer.hemolysis_solver.HemolysisSolver`.
 
@@ -61,45 +49,35 @@ class RBCModel:
         :type dv: Callable[[float],Vector9]
         :param omega: MRF angular velocity vector as a function of pathline time.
         :type omega: Callable[[float],Vector3]
-        :param x: Relevant position measure as a function of pathline time, e.g., absolute coordinates or distance from rotational center.
+        :param x: Relevant position measure as a function of pathline time, e.g., absolute coordinates or distance from rotational center. Only required for tank-treading with pathline correction.
         :type x: Callable[[float],Vector3]
-        :param v: Velocity as a function of pathline time.
+        :param v: Velocity as a function of pathline time. Only required for tank-treading with pathline correction.
         :type v: Callable[[float],Vector3]
         """
 
+        """Sanity checks."""
+        # Start and end time are always required.
+        if t0 is None or tend is None:
+            raise ValueError('Start and end time have to be defined.')
+        
+        # Check validity of start and end time.
+        if t0 >= tend:
+            raise ValueError('Start time has to be smaller than end time.')
+
+        # Velocity gradient is always required.
+        if dv is None:
+            raise ValueError('Velocity gradient not defined.')
+        
+        # If omega is not defined, set it to zero, assuming stationary frame of reference.
+        if omega is None:
+            omega = lambda t: np.zeros(3)
+
+        """Assign quantities."""
         self._t0 = t0
         self._tend = tend
         self._dv = dv
         self._omega = omega
-        self._x = x
-        self._v = v
 
-        self._check_completeness()
-    
-    def _check_completeness(self) -> None:
-        """
-        Check if all required quantities are defined. 
-        Start and end time as well as velocity gradient are always required. If omega is not defined, it is set to zero, assuming a stationary frame of reference. Other more individual checks can be implemented by model subclasses.
-
-        :raises ValueError: If any required quantity is not defined.
-        """
-
-        # Start and end time are always required.
-        if self._t0 is None or self._tend is None:
-            raise ValueError('Start and end time have to be defined.')
-        
-        # Check validity of start and end time.
-        if self._t0 >= self._tend:
-            raise ValueError('Start time has to be smaller than end time.')
-
-        # Velocity gradient is always required.
-        if self._dv is None:
-            raise ValueError('Velocity gradient not defined.')
-        
-        # If omega is not defined, set it to zero, assuming stationary frame of reference.
-        if self._omega is None:
-            self._omega = lambda t: np.zeros(3)
-        
     def _compute_strain_tensor(self, t: float) -> Tensor3:
         """
         Compute strain tensor at time t.
