@@ -7,11 +7,8 @@ from os.path import join
 def get_seeds():
     """Define seeds for pathlines."""
     x0 = np.asarray([0, 5.0, 0])
-    # n = 7
     n = 9
-    # r_arr = np.linspace(0.01,0.2,n)
-    r_arr = [0.01] 
-    # phi_arr = [np.pi*0.5]
+    r_arr = np.linspace(0.01,0.2,n)
     phi_arr = np.linspace(0, 2*np.pi, n, endpoint=False)
 
     x0_list = []
