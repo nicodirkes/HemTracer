@@ -1,15 +1,18 @@
 from __future__ import annotations
+from ctypes import Array
+from math import e
 from hemtracer.eulerian_flow_field import EulerianFlowField
-from vtk import vtkStreamTracer
+from vtk import vtkStreamTracer, vtkDoubleArray, vtkPolyData, vtkPolyDataWriter, vtkPoints, vtkIntArray, vtkCellArray, vtkPolyLine
+from vtkmodules.util.numpy_support import numpy_to_vtk
 from scipy.interpolate import interp1d
 import numpy as np
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from numpy.typing import ArrayLike, NDArray
 from hemtracer._definitions import Vector3, vtk_point_assoc
-from collections.abc import Callable
 
 
 integration_time_name = 'IntegrationTime'   # integration time along pathline
+position_name = 'Position'                  # position along pathline
 
 class PathlineAttribute:
     """Class for storing a quantity of interest along a pathline. The data is stored as a function of the integration time. All class attributes are meant to be publicly accessible.
@@ -50,7 +53,20 @@ class PathlineAttribute:
         self.t = np.asarray(t)
         self.val = np.asarray(val)
         self.name = name
-        self.interpolator = interp1d(self.t, self.val, axis=0, kind=interpolation_scheme)
+        self.interpolator = interp1d(self.t, self.val, axis=0, kind=interpolation_scheme, assume_sorted=True)
+
+    def get_number_of_components(self) -> int:
+        """
+        Returns the number of components of the attribute.
+
+        :return: The number of components.
+        :rtype: int
+        """
+
+        if self.val.ndim == 1:
+            return 1
+
+        return self.val.shape[1]
 
 class Pathline:
     """
@@ -82,13 +98,88 @@ class Pathline:
         :type x: List[Vector3]
         """
 
-        if len(t) > 1:
-            self._t0 = t[0]
-            self._tend = t[-1]
-        else:
+        if len(t) == 1:
             raise ValueError("Pathline must have at least two points.")
         
-        self._attributes = [ PathlineAttribute(t, x, 'Position') ]
+        self._t0 = t[0]
+        self._tend = t[-1]
+        self._attributes = [ PathlineAttribute(t, x, position_name) ]
+
+    def get_position_attribute(self) -> PathlineAttribute:
+        """
+        Returns the 'Position' attribute of the pathline. Has to exist by definition.
+
+        :raises AttributeError: If no position attribute exists on pathline.
+        :return: The 'Position' attribute.
+        :rtype: PathlineAttribute
+        """
+
+        position_attribute = self.get_attribute(position_name)
+        if position_attribute is None:
+            raise AttributeError('No position attribute found on pathline.')
+        
+        return position_attribute
+    
+    def unify_attributes(self, attribute_names: List[str] | None, ref_attribute_name: str = position_name) -> Tuple[NDArray, List[str]]:
+        """
+        Interpolates all attributes to the same time points of some reference attribute (if not specified, use the 'Position' attribute) and return them as an array. The first column of each array contains the time points used.
+
+        :param attribute_names: A list of attribute names to unify. If None, all attributes are unified.
+        :type attribute_names: List[str] | None
+        :param ref_attribute_name: The name of the attribute to use as reference, defaults to 'Position'.
+        :type ref_attribute_name: str
+        :return: A tuple containing the array of interpolated values and a list of attribute names. The first column of the array contains the time points used.
+        :rtype: Tuple[NDArray, List[str]]
+        """
+
+        # Get integration times of reference attribute.
+        ref_attribute = self.get_attribute(ref_attribute_name)
+        if ref_attribute is None:
+            raise AttributeError('Reference attribute ' + ref_attribute_name + ' not found on pathline.')
+        t_ref = ref_attribute.t
+        
+        # Find attributes to unify.
+        if attribute_names is None:
+            attribute_names = self.get_attribute_names()
+        
+        # Determine the total number of components.
+        n_components_total = 1 # for time
+        for attribute_name in attribute_names:
+            attribute = self.get_attribute(attribute_name)
+            if attribute is None:
+                raise AttributeError('No attribute with name ' + attribute_name + ' found on pathline.')
+            n_components_total += attribute.get_number_of_components()
+
+        # Initialize output array for interpolated values.
+        vals_interp = np.zeros((len(t_ref), n_components_total))
+        
+        # Interpolate attributes.
+        i_c = 1 # index for total component, start at 1 because first column is time
+        attribute_names_comp = [] # list of all attribute names, including components
+        for attribute_name in attribute_names:
+            attribute = self.get_attribute(attribute_name)
+            if attribute is None:
+                raise AttributeError('No attribute with name ' + attribute_name + ' found on pathline.')
+            n_c = attribute.get_number_of_components()
+            
+            # Add attribute names to list. If attribute is vector-valued, add component index.
+            if n_c > 1:
+                attribute_names_comp.extend([attribute_name + '_' + str(i) for i in range(n_c)])
+            else:
+                attribute_names_comp.append(attribute_name)
+
+            # Add (interpolated) attribute values to array.
+            i_c_new = i_c + n_c
+            interpolated_attribute = attribute.interpolator(t_ref)
+            vals_interp[:,i_c:i_c_new] = interpolated_attribute
+            i_c = i_c_new
+        
+        # Add integration times to array.
+        vals_interp[:,0] = t_ref
+        attribute_names_comp.insert(0, integration_time_name)
+
+        return (vals_interp, attribute_names_comp)
+
 
     def get_attribute(self, name: str) -> PathlineAttribute|None:
         """
@@ -138,9 +229,9 @@ class Pathline:
         """
         Adds an attribute to the pathline.
 
-        :param t: The integration times along the pathline.
+        :param t: The integration times along the pathline. If not in the range [t0, tend], the integration times are clipped.
         :type t: ArrayLike
-        :param val: The values of the attribute along the pathline.
+        :param val: The values of the attribute along the pathline (first axis must correspond to integration times). If the attribute is vector-valued, the second axis must correspond to the components of the vector.
         :type val: ArrayLike
         :param name: The name of the attribute.
         :type name: str
@@ -154,8 +245,34 @@ class Pathline:
                 print("Attribute with name " + name + " already exists on pathline.")
                 print("Overwriting attribute.")
                 self._attributes.remove(attribute)
+        
+        t_att = np.squeeze(np.asarray(t))
+        val_att = np.asarray(val)
+        if val_att.ndim == 1: # ensure 2D array
+            val_att = val_att[:,np.newaxis]
 
-        self._attributes.append(PathlineAttribute(t, val, name, interpolation_scheme))
+        if len(t_att) != len(val_att):
+            raise ValueError("Length of integration times and values must be equal.")
+        
+        if len(t_att) == 1:
+            raise ValueError("Pathline must have at least two points.")
+
+        # If times are not in range, clip integration times and interpolate values to new bounds.
+        if t_att[0] < self._t0 or t_att[-1] > self._tend:
+            t_clip = np.clip(t_att, self._t0, self._tend)
+            val_interp = interp1d(t, val, axis=0, kind=interpolation_scheme, assume_sorted=True)
+            val_att = np.asarray(val_interp(t_clip))
+            t_att = t_clip
+
+        # If necessary, extrapolate values to initial and final integration time by repeating first and last value.
+        if t_att[0] > self._t0:
+            t_att = np.insert(t_att, 0, self._t0)
+            val_att = np.insert(val_att, 0, val_att[0,:], axis=0)
+        if t_att[-1] < self._tend:
+            t_att = np.append(t_att, self._tend)
+            val_att = np.append(val_att, val_att[-1:,:], axis=0)
+
+        self._attributes.append(PathlineAttribute(t_att, val_att, name, interpolation_scheme))
     
     def get_t0(self) -> float:
         """
@@ -262,10 +379,11 @@ class PathlineTracker:
             # Store results in Pathline object.
             pl = Pathline(list(t_np), list(points_np))
 
-            # Additionally store interpolated field data and integration time.
+            # Additionally store interpolated field data.
             for j in range(point_data.GetNumberOfArrays()):
                 name = point_data.GetArrayName(j)
-                pl.add_attribute(t_np, np.array(point_data.GetArray(name), copy=True), name)
+                if name != integration_time_name: # integration time is already stored
+                    pl.add_attribute(t_np, np.array(point_data.GetArray(name), copy=True), name)
 
             self._pathlines.append(pl)
             i = i+1
@@ -312,12 +430,9 @@ class PathlineTracker:
         for pathline in self._pathlines:
 
             # Get integration times and interpolator.
-            position_attribute = pathline.get_attribute('Position')
-            if position_attribute is None:
-                raise AttributeError("No position attribute found on pathline.")
-            else:
-                t = position_attribute.t
-                x_interp = position_attribute.interpolator
+            position_attribute = pathline.get_position_attribute()
+            t = position_attribute.t
+            x_interp = position_attribute.interpolator
 
             # Determine time points at which to interpolate.
             if sampling_rate > 0:
@@ -417,3 +532,161 @@ class PathlineTracker:
         """
 
         return self._flow_field.get_name_distance_center()
+
+    def to_file(self, filename: str, attribute_names: List[str] | None = None) -> None:
+        """
+        Write pathlines to file. If attribute names are specified, only those attributes are written to file. Otherwise, all attributes are written to file.
+
+        Interpolates all attributes to the same time points (those of the 'Position' attribute) before writing to file.
+
+        Supports writing to CSV, npz, and VTK files. In case of CSV and VTK, it is assumed that all pathlines contain the same attributes, as this is required by the file format (every point must have the same number of attributes). If you want to write pathlines with different attributes to file, there are two options: (1) Write to npz file, which does not require all pathlines to have the same attributes. (2) Instantiate multiple PathlineTracker objects, each with a different set of attributes, and write each one to a separate file.
+        In case of npz, the attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
+
+        :param filename: The name of the file to write to, including path and extension. Supported extensions are .csv, .npz, and .vtk.
+        :type filename: str
+        :param attribute_names: A list of attribute names to write to file. If None, all attributes are written to file (default).
+        :type attribute_names: List[str], optional
+        """
+        
+        attributes = [ pathline.unify_attributes(attribute_names) for pathline in self._pathlines ]
+
+        # Determine appropriate writer.
+        ext = filename.split('.')[-1]
+        match ext:
+            case 'csv':
+                writer = self._write_csv
+            case 'npz':
+                writer = self._write_npz
+            case 'vtk':
+                writer = self._write_vtk
+            case _:
+                raise ValueError('Unsupported file extension. Supported extensions are .csv, .npz, and .vtk.')
+        
+        # Write to file.
+        writer(filename, attributes)
+
+    def _write_csv(self, filename: str, attributes: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to CSV file. It is assumed that all pathlines contain the same attributes.
+
+        :param filename: The name of the file to write to, including path and extension.
+        :type filename: str
+        :param attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type attributes: List[Tuple[NDArray,List[str]]]
+        """
+        
+        # Store to check if all pathlines contain same attributes.
+        attribute_names_ref = attributes[0][1]
+
+        # Write to file.
+        with open(filename, 'w') as f:
+            # Write header.
+            f.write('t')
+            for attribute_name in attribute_names_ref:
+                f.write(',' + attribute_name)
+            f.write('\n')
+
+            # Write data.
+            for attribute in attributes:
+                if attribute[1] != attribute_names_ref:
+                    raise ValueError('Not all pathlines contain the same attributes. Cannot write to CSV file.')
+                
+                vals = attribute[0]
+                for i in range(vals.shape[0]):
+                    f.write(str(vals[i,0]))
+                    for j in range(1,vals.shape[1]):
+                        f.write(',' + str(vals[i,j]))
+                    f.write('\n')
+    
+    def _write_npz(self, filename: str, attributes: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to npz file. It is not assumed that all pathlines contain the same attributes. The attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
+
+        :param filename: The name of the file to write to.
+        :type filename: str
+        :param attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type attributes: List[Tuple[NDArray,List[str]]]
+        """
+
+        # Create interleaved list of attribute values and names.
+        attribute_value_name_list = [val for pair in attributes for val in pair]
+
+        # Write to file.
+        np.savez(filename, *attribute_value_name_list)
+
+    def _write_vtk(self, filename: str, pls_attributes: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to VTK file. All pathlines are written to the same VTK file. They are identified by the attribute 'PathlineID', which is stored as a point data array. 
+
+        :param filename: The name of the file to write to.
+        :type filename: str
+        :param pl_attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type pl_attributes: List[Tuple[NDArray,List[str]]]
+        """
+
+        # Create a cell array to store the lines in and add the lines to it
+        cells = vtkCellArray()
+
+        # Create a vtkPoints object and store the points in it
+        points = vtkPoints()
+
+        # Create a polydata to store everything
+        polyData = vtkPolyData()
+
+        idx = 0
+
+        for pl_attribute in pls_attributes:
+
+            # Get pathline attributes.
+            x = pl_attribute[0][:,1:4]
+            
+            # Create points.
+            for point in x:
+                points.InsertNextPoint(point)
+            
+            # Create pathline.
+            n = len(x)
+            polyLine = vtkPolyLine()
+            polyLine.GetPointIds().SetNumberOfIds(n)
+
+            for (i, j) in enumerate(np.arange(idx, idx+n)):
+                polyLine.GetPointIds().SetId(i, j)
+            
+            cells.InsertNextCell(polyLine)
+            idx = idx+n
+        
+        # Add everything to the dataset
+        polyData.SetPoints(points)
+        polyData.SetLines(cells)
+
+        # Add pathline ID as point data array.
+        pathline_id_array = vtkIntArray()
+        pathline_id_array.SetNumberOfComponents(0)
+        pathline_id_array.SetName('PathlineID')
+        for i in range(len(pls_attributes)):
+            pathline_id_array.InsertNextValue(i)
+        polyData.GetCellData().AddArray(pathline_id_array)
+
+        # Add attributes as point data arrays.
+        attribute_names = pls_attributes[0][1] # assume all pathlines have same attributes
+      
+        # Aggregate attribute values into array by component.
+        attribute_values = pls_attributes[0][0]
+
+        for pl_attribute in pls_attributes[1:]:
+            if pl_attribute[1] != attribute_names:
+                raise ValueError('Not all pathlines contain the same attributes. Cannot write to VTK file.')
+            attribute_values = np.append(attribute_values, pl_attribute[0], axis=0)
+        
+        # Add attribute values to polydata.
+        for (i, attribute_name) in enumerate(attribute_names):
+            attribute_array = numpy_to_vtk(attribute_values[:,i])
+            attribute_array.SetNumberOfComponents(0)
+            attribute_array.SetName(attribute_name)
+            polyData.GetPointData().AddArray(attribute_array)
+
+        # Write to file
+        writer = vtkPolyDataWriter()
+        writer.SetInputData(polyData)
+        writer.SetFileName(filename)
+        writer.Write()
