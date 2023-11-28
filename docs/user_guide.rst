@@ -94,17 +94,17 @@ In addition, we can choose a model to compute the index of hemolysis from the re
 
 .. code-block:: python
 
-    hemolysis_model = ht.hemolysis_model.PowerLawModel( ht.hemolysis_model.IHCorrelation.SONG )
+    hemolysis_model = ht.hemolysis_model.PowerLawModel( cell_model, ht.hemolysis_model.IHCorrelation.SONG )
 
 Refer to the documentations of :class:`hemtracer.hemolysis_model.PowerLawModel` and :class:`hemtracer.hemolysis_model.IHCorrelation` for details on the configuration options.
 
-Finally, we construct a :class:`hemtracer.HemolysisSolver` object, which can compute the relevant hemolysis quantities:
+Finally, we construct a :class:`hemtracer.HemolysisSolver` object, which can compute the relevant hemolysis quantities.
 
 .. code-block:: python
 
     hemolysis_solver = ht.HemolysisSolver(pathline_tracker)
     hemolysis_solver.compute_representativeShear(cell_model)
-    hemolysis_solver.compute_hemolysis(cell_model, hemolysis_model)
+    hemolysis_solver.compute_hemolysis(hemolysis_model)
 
 
 
