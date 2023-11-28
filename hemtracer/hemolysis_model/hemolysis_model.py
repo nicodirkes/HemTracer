@@ -221,7 +221,7 @@ class PowerLawModel:
         partial_sum = D0
 
         for i in range(1, len(t)):
-            tau = self._mu * G[i-1]
+            tau = self._mu * G[i]
             dt = t[i] - t[i-1]
             partial_sum += dt * tau**(self._beta/self._alpha)
             IH[i] = IH[i-1] + self._alpha * self._C * partial_sum**(self._alpha-1) * tau**(self._beta/self._alpha) * dt
