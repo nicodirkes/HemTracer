@@ -548,6 +548,8 @@ class PathlineTracker:
         :type attribute_names: List[str], optional
         """
         
+        print('Writing pathlines to file ' + filename + '...')
+        
         attributes = [ pathline.unify_attributes(attribute_names) for pathline in self._pathlines ]
 
         # Determine appropriate writer.
