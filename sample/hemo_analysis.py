@@ -23,7 +23,7 @@ def plot_geffs(hemolysis_solver: ht.HemolysisSolver, models: List[ht.rbc_model.R
     
     i = 0
 
-    sols = [hemolysis_solver.get_representativeShear(model) for model in models]
+    sols = [hemolysis_solver.get_output(model) for model in models]
 
     for sol_models in zip(*sols):
 
@@ -45,7 +45,7 @@ def plot_geff_lagr_eul(hemolysis_solver: ht.HemolysisSolver, model: ht.rbc_model
     """Plot Geff for Lagrangian and Eulerian data in one plot."""
 
     i = 0
-    geff_lagr_pls = hemolysis_solver.get_representativeShear(model)
+    geff_lagr_pls = hemolysis_solver.get_output(model)
     geff_eul_pls = pathline_tracker.get_attribute("Geff")
 
 
@@ -107,17 +107,17 @@ def main() -> None:
 
     correlation_song = ht.hemolysis_model.IHCorrelation.SONG
 
-    hemolysis_model = ht.hemolysis_model.PowerLawModel(hemolysis_correlation = correlation_song, 
-                                       mu = 0.0032, integration_scheme='timeDiff')
+    cell_models = [model_simp, model_tt, model_tt_corr, model_stress]
 
-    models = [model_simp, model_tt, model_tt_corr, model_stress]
+    hemolysis_models = [ht.hemolysis_model.PowerLawModel(cell_model, hemolysis_correlation = correlation_song, 
+                                    mu = 0.0032, integration_scheme='timeDiff') for cell_model in cell_models]
 
     hemolysis_solver = ht.HemolysisSolver(pathline_tracker)
-    for model in models:
-        hemolysis_solver.compute_representativeShear(model)
-        hemolysis_solver.compute_hemolysis(cell_model=model, powerlaw_model=hemolysis_model)
+    for cell_model, hemolysis_model in zip(cell_models, hemolysis_models):
+        hemolysis_solver.compute_representativeShear(cell_model)
+        hemolysis_solver.compute_hemolysis(hemolysis_model)
     
-    plot_geffs(hemolysis_solver, models, path="../out")
+    plot_geffs(hemolysis_solver, cell_models, path="../out")
 
 
 if __name__ == '__main__':
