@@ -127,14 +127,14 @@ Hemolysis models employ an empirical correlation between the scalar shear rate :
 
 .. math:: IH = A_\mathrm{Hb} (\mu G_s)^{\alpha_\mathrm{Hb}} t^{\beta_\mathrm{Hb}} \, .
 
-This is implemented as :class:`hemtracer.hemolysis_models.PowerLaw`. 
+This is implemented as :class:`hemtracer.hemolysis_model.PowerLaw`. 
 
 The parameter :math:`\mu` represents the viscosity of blood. It is usually assumed to be constant and equal to :math:`3.5 \, \mathrm{mPa \cdot \mathrm{s}`. The parameter :math:`t` represents exposure time. It is integrated along the pathline, along with the shear rate :math:`G_s`.
 
 Coefficients
 ~~~~~~~~~~~~~~~~~~~
 
-The coefficients :math:`A_\mathrm{Hb}`, :math:`\alpha_\mathrm{Hb}` and :math:`\beta_\mathrm{Hb}` are determined empirically. Over the past 30 years, several studies have found a wide range of possible values. The available correlations are given in :class:`hemtracer.hemolysis_models.IHCorrelation`. 
+The coefficients :math:`A_\mathrm{Hb}`, :math:`\alpha_\mathrm{Hb}` and :math:`\beta_\mathrm{Hb}` are determined empirically. Over the past 30 years, several studies have found a wide range of possible values. The available correlations are given in :class:`hemtracer.hemolysis_model.IHCorrelation`. 
 
 
 Numerical integration
@@ -144,7 +144,7 @@ The index of hemolysis is computed by numerically integrating the power law alon
 
 .. math:: HI = C t^\alpha \sigma^\beta \, .
 
-They compiled five approaches to integrate this power law. They can be selected in the constructor of :class:`hemtracer.hemolysis_models.PowerLaw` by setting the option `integration_scheme`. The available options are:
+They compiled five approaches to integrate this power law. They can be selected in the constructor of :class:`hemtracer.hemolysis_model.PowerLaw` by setting the option `integration_scheme`. The available options are:
 
 +----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Option               | Equation                                                                                                                                                                          |
