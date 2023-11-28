@@ -129,6 +129,16 @@ class RBCModel:
 
         raise NotImplementedError('get_name has to be implemented in subclasses.')
     
+    def get_attribute_name(self) -> str:
+        """
+        Get name of resulting scalar shear rate attribute on pathlines.
+
+        :return: Name of scalar shear rate attribute.
+        :rtype: str
+        """
+
+        return 'G_' + self.get_name()
+    
     def compute_representative_shear(self) -> Tuple[NDArray, NDArray]:
         """
         Solve blood damage model to compute scalar shear rate and return times and scalar shear rate along pathline.

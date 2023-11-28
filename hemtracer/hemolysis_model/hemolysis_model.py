@@ -5,6 +5,8 @@ import numpy as np
 from numpy.typing import NDArray
 from enum import Enum
 
+from hemtracer.rbc_model.rbc_model import RBCModel
+
 
 CorrelationCoefficients = namedtuple('CorrelationCoefficients', ['A_Hb', 'alpha_Hb', 'beta_Hb'])
 r"""
@@ -33,6 +35,11 @@ class IHCorrelation(CorrelationCoefficients, Enum):
 
 class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
+    """
+
+    _scalar_shear_name: str
+    """
+    Name of scalar shear rate attribute.
     """
 
     _hemolysis_correlation: IHCorrelation
@@ -75,10 +82,12 @@ class PowerLawModel:
     Function that computes hemolysis index from time and scalar shear rate using the desired integration scheme.
     """
 
-    def __init__(self, hemolysis_correlation: IHCorrelation = IHCorrelation.GIERSIEPEN, mu: float = 3.5e-3, integration_scheme: str = 'basic') -> None:
+    def __init__(self, scalar_shear: RBCModel | str, hemolysis_correlation: IHCorrelation = IHCorrelation.GIERSIEPEN, mu: float = 3.5e-3, integration_scheme: str = 'basic') -> None:
         """
         Initialization defines all parameters to use. They cannot be changed afterwards.
 
+        :param scalar_shear: Model to compute scalar shear rate, or name of attribute containing representative shear rate, e.g., 'Geff' if available from an Eulerian simulation.
+        :type scalar_shear: RBCModel | str
         :param hemolysis_correlation: Hemolysis correlation to use.
         :type hemolysis_correlation: HemolysisCorrelation
         :param mu: Dynamic viscosity of blood. Defaults to 3.5e-3.
@@ -86,6 +95,11 @@ class PowerLawModel:
         :param integration_scheme: Integration scheme for hemolysis correlation. Integration schemes defined according to Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. Valid options are 'basic' (HI1), 'timeDiff' (HI2), 'linearized' (HI3), 'mechDose' (HI4), 'effTime' (HI5). Defaults to 'basic'.
         :type integration_scheme: str
         """
+
+        if isinstance(scalar_shear, RBCModel):
+            self._scalar_shear_name = scalar_shear.get_name()
+        else:
+            self._scalar_shear_name = scalar_shear
 
         self._corr_name = hemolysis_correlation.name
         self._integration_scheme_name = integration_scheme
@@ -245,3 +259,23 @@ class PowerLawModel:
         """
 
         return self._corr_name + '_' + self._integration_scheme_name
+    
+    def get_attribute_name(self) -> str:
+        """
+        Get the name of the attribute that will be added to pathlines.
+
+        :return: The name of the attribute that will be added to pathlines.
+        :rtype: str
+        """
+
+        return 'IH_' + self.get_name() + '_' + self._scalar_shear_name
+    
+    def get_scalar_shear_name(self) -> str:
+        """
+        Get the name of the scalar shear rate attribute.
+
+        :return: The name of the scalar shear rate attribute.
+        :rtype: str
+        """
+
+        return self._scalar_shear_name

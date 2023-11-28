@@ -672,11 +672,10 @@ class PathlineTracker:
       
         # Aggregate attribute values into array by component.
         attribute_values = pls_attributes[0][0]
-
-        for pl_attribute in pls_attributes[1:]:
-            if pl_attribute[1] != attribute_names:
+        for pl_attributes in pls_attributes[1:]:
+            if pl_attributes[1] != attribute_names:
                 raise ValueError('Not all pathlines contain the same attributes. Cannot write to VTK file.')
-            attribute_values = np.append(attribute_values, pl_attribute[0], axis=0)
+            attribute_values = np.append(attribute_values, pl_attributes[0], axis=0)
         
         # Add attribute values to polydata.
         for (i, attribute_name) in enumerate(attribute_names):

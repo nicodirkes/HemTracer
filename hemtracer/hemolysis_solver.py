@@ -20,7 +20,7 @@ class HemolysisSolver:
     Name of velocity attribute on pathlines.
     """
 
-    _dv_name: str | None = None  
+    _dv_name: str
     """
     Name of velocity gradient attribute on pathlines.
     """
@@ -42,14 +42,18 @@ class HemolysisSolver:
         :param pathline_tracker: Pathline tracker object.
         :type pathline_tracker: PathlineTracker
         """
+
         self._pathline_tracker = pathline_tracker
         self._v_name = self._pathline_tracker.get_name_velocity() # Velocity.
-        self._dv_name = self._pathline_tracker.get_name_velocity_gradient() # Velocity gradient.
+
+        dv_name = self._pathline_tracker.get_name_velocity_gradient() # Velocity gradient.
+        if dv_name is None:
+            raise AttributeError('No velocity gradient data available on pathlines.')
+        else:
+            self._dv_name = dv_name
+
         self._omega_name = self._pathline_tracker.get_name_omega_frame() # Angular velocity of frame of reference.
         self._r_name = self._pathline_tracker.get_name_distance_center() # Orthogonal distance to center of rotation.
-
-        if self._dv_name is None: 
-            raise AttributeError('No velocity gradient data available on pathlines.')
 
 
     def compute_representativeShear(self, model: RBCModel) -> None:
@@ -62,7 +66,7 @@ class HemolysisSolver:
         i=0
         pathlines = self._pathline_tracker.get_pathlines()
         n_total = len(pathlines)
-        G_rep_name = self._get_attribute_name_representativeShear(model)
+        G_rep_name = model.get_attribute_name()
 
         print('Integrating ' +  model.get_name() + ' model along pathlines...')
         for pathline in pathlines:
@@ -87,23 +91,21 @@ class HemolysisSolver:
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.")
 
-    def compute_hemolysis(self, cell_model: RBCModel, powerlaw_model: PowerLawModel) -> None:
+    def compute_hemolysis(self, powerlaw_model: PowerLawModel) -> None:
         """
         Computes index of hemolysis along pathlines in percent.
 
-        :param cell_model: Model that was used to compute scalar shear rate.
-        :type cell_model: RBCModel
         :param powerlaw_model: Power law model to use for computing index of hemolysis.
         :type powerlaw_model: PowerLawModel
         """
 
-        cell_model_solutions = self.get_representativeShear(cell_model)
+        cell_model_solutions = self._pathline_tracker.get_attribute(powerlaw_model.get_scalar_shear_name())
         pathlines = self._pathline_tracker.get_pathlines()
 
         n_total = len(cell_model_solutions)
         i=0
 
-        print('Integrating ' + powerlaw_model.get_name() + ' power law along pathlines using ' + cell_model.get_name() + ' cell model...')
+        print('Computing ' + powerlaw_model.get_attribute_name() + ' along pathlines')
         for (sol, pl) in zip(cell_model_solutions, pathlines):
             
             
@@ -112,47 +114,20 @@ class HemolysisSolver:
 
             IH = powerlaw_model.compute_hemolysis(t, G)
             
-            pl.add_attribute(t, IH, self._get_attribute_name_hemolysis(powerlaw_model, cell_model))
+            pl.add_attribute(t, IH, powerlaw_model.get_attribute_name())
 
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.")
 
-    def _get_attribute_name_representativeShear(self, model: RBCModel) -> str:
-        """
-        Returns name of representative shear rate attribute on pathlines.
-
-        :param model: Cell model to use.
-        :type model: RBCModel
-        :return: Name of representative shear rate attribute.
-        :rtype: str
-        """
-
-        representative_shear_rate_name = 'G'
-        return representative_shear_rate_name + '_' + model.get_name()
     
-    def _get_attribute_name_hemolysis(self, powerlaw_model: PowerLawModel, cell_model: RBCModel) -> str:
+    def get_output(self, model: RBCModel | PowerLawModel) -> List[Dict[str, NDArray]]:
         """
-        Returns name of hemolysis attribute on pathlines.
+        Obtain hemolysis solutions along pathlines after they have been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
 
-        :param powerlaw_model: Power law model to use.
-        :type powerlaw_model: PowerLawModel
-        :param cell_model: Cell model to use.
-        :type cell_model: RBCModel
-        :return: Name of hemolysis attribute.
-        :rtype: str
-        """
-
-        index_of_hemolysis_name = 'IH'
-        return index_of_hemolysis_name + '_' + powerlaw_model.get_name() + '_' + cell_model.get_name()
-    
-    def get_representativeShear(self, model: RBCModel) -> List[Dict[str, NDArray]]:
-        """
-        Obtain representative scalar shear rate along pathlines after it has been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
-
-        :param model: Cell model to use.
-        :type model: RBCModel
+        :param model: Model to consider.
+        :type model: str
         :return: List of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
         :rtype: List[Dict[str, NDArray]]
         """
 
-        return self._pathline_tracker.get_attribute(self._get_attribute_name_representativeShear(model))
+        return self._pathline_tracker.get_attribute(model.get_attribute_name())
