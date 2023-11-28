@@ -4,6 +4,7 @@ from hemtracer.hemolysis_model import PowerLawModel
 from hemtracer.pathlines import PathlineTracker
 from typing import List, Dict
 from numpy.typing import NDArray
+import numpy as np
 
 class HemolysisSolver:
     """
@@ -131,3 +132,18 @@ class HemolysisSolver:
         """
 
         return self._pathline_tracker.get_attribute(model.get_attribute_name())
+    
+    def average_hemolysis(self, model: PowerLawModel) -> float:
+        """
+        Average hemolysis index over the end points of all pathlines.
+
+        :param model: Power law model to use.
+        :type model: PowerLawModel
+        :return: Average hemolysis index.
+        :rtype: float
+        """
+
+        IHs = self._pathline_tracker.get_attribute(model.get_attribute_name())
+        IHs = [IH['val'][-1] for IH in IHs]
+
+        return np.mean(IHs)
