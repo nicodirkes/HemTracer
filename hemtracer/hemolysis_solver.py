@@ -123,11 +123,11 @@ class HemolysisSolver:
     
     def get_output(self, model: RBCModel | PowerLawModel) -> List[Dict[str, NDArray]]:
         """
-        Obtain hemolysis solutions along pathlines after they have been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
+        Obtain hemolysis solutions along pathlines after they have been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and output variable.
 
         :param model: Model to consider.
         :type model: str
-        :return: List of dictionaries, each one representing a pathline and containing the keys 't' and 'val' for time and representative shear rate.
+        :return: List of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and output variable.
         :rtype: List[Dict[str, NDArray]]
         """
 
@@ -144,6 +144,6 @@ class HemolysisSolver:
         """
 
         IHs = self._pathline_tracker.get_attribute(model.get_attribute_name())
-        IHs = [IH['val'][-1] for IH in IHs]
+        IHs = [IH['y'][-1] for IH in IHs]
 
         return np.mean(IHs)

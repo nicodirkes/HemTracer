@@ -97,7 +97,7 @@ class PowerLawModel:
         """
 
         if isinstance(scalar_shear, RBCModel):
-            self._scalar_shear_name = scalar_shear.get_name()
+            self._scalar_shear_name = scalar_shear.get_attribute_name()
         else:
             self._scalar_shear_name = scalar_shear
 
