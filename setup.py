@@ -11,7 +11,7 @@ with open('LICENSE') as f:
 
 setup(
     name='hemtracer',
-    version='0.2.0',
+    version='0.2.1',
     description='Lagrangian hemolysis post-processing for Eulerian CFD simulations',
     long_description=readme,
     author='Nico Dirkes',
