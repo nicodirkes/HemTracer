@@ -86,7 +86,7 @@ Stress-based models do not explicitly resolve cell deformation. Instead, they co
 Bludszuweit model
 ^^^^^^^^^^^^^^^^^^
 
-This model was proposed by Bludszuweit :cite:p:`c.bludszuweitModelGeneralMechanical1995`. It computes a representative scalar from instantaneous fluid strain, similar to the von Mises stress:
+This model was proposed by Bludszuweit :cite:p:`bludszuweitModelGeneralMechanical1995a`. It computes a representative scalar from instantaneous fluid strain, similar to the von Mises stress:
 
 .. math:: G_s = \frac{1}{\sqrt{3}} \sqrt{
     \left(E_{xx}^2 + E_{yy}^2 + E_{zz}^2\right)
