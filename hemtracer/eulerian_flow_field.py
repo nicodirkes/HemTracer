@@ -2,6 +2,7 @@ from __future__ import annotations
 from vtk import vtkUnstructuredGridReader, vtkUnstructuredGrid
 from vtk import vtkDoubleArray, vtkIdTypeArray, vtkPoints, vtkPolyData
 from vtk import vtkThreshold, vtkProbeFilter, vtkCellDerivatives, vtkGradientFilter
+from vtk import vtkAttributeSmoothingFilter
 from vtkmodules.util.numpy_support import numpy_to_vtk
 import numpy as np
 from numpy.typing import NDArray
@@ -106,6 +107,43 @@ class EulerianFlowField:
             arr_vtk_cell = self._vtk_flow_field.GetCellData().GetArray(self._velocity_gradient_name)
             if arr_vtk_cell is None:
                 raise ValueError("Velocity gradient field {} not found in {}".format(self._velocity_gradient_name, self._vtk_flow_field_name))
+        
+    def smooth_node_data(self, attribute_name: str) -> None:
+        """
+        Smooth certain node-centered data in the VTK file.
+
+        :param attribute_name: The name of the node-centered attribute to smooth.
+        :type attribute_name: str
+        """
+
+        print("Smoothing node-centered  attribute {}...".format(attribute_name))
+
+        # Check if attribute exists.
+        arr_vtk = self._vtk_flow_field.GetPointData().GetArray(attribute_name)
+        if arr_vtk is None:
+            raise ValueError("Attribute {} not found in {}".format(attribute_name, self._vtk_flow_field_name))
+        
+        # Construct exclusion list (all fields except attribute_name).
+        n_arrays = self._vtk_flow_field.GetPointData().GetNumberOfArrays()
+        excluded_arrays = [ self._vtk_flow_field.GetPointData().GetArrayName(i) for i in range(n_arrays) if self._vtk_flow_field.GetPointData().GetArrayName(i) != attribute_name ]
+        
+        # Smooth attribute.
+        smooth_filter = vtkAttributeSmoothingFilter()
+        smooth_filter.SetInputData(self._vtk_flow_field)
+        smooth_filter.SetNumberOfIterations(2)
+        smooth_filter.SetRelaxationFactor(0.1)
+        smooth_filter.SetWeightsTypeToDistance2()
+        smooth_filter.SetSmoothingStrategyToAllButBoundary()
+        for excluded_array in excluded_arrays:
+            smooth_filter.AddExcludedArray(excluded_array)
+        smooth_filter.Update()
+
+        # Replace attribute with smoothed attribute.
+        arr_vtk_smooth = smooth_filter.GetOutput().GetPointData().GetArray(attribute_name)
+        self._vtk_flow_field.GetPointData().RemoveArray(attribute_name)
+        self._vtk_flow_field.GetPointData().AddArray(arr_vtk_smooth)
+
+
 
     def import_field_data(self, vtk_file_name: str, 
                           field_names_point: List[str] | None = None, field_names_cell: List[str] | None = None) -> None:
