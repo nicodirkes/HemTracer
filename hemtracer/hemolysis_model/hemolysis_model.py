@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections import namedtuple
 from collections.abc import Callable
+from re import I
 import numpy as np
 from numpy.typing import NDArray
 from enum import Enum
@@ -151,12 +152,11 @@ class PowerLawModel:
         :rtype: NDArray
         """
 
-        IH = np.zeros_like(t)
+        tau = np.squeeze(self._mu * G[:-1])
+        dt = np.diff(t)
 
-        for i in range(1, len(t)):
-            tau = self._mu * G[i-1]
-            dt = t[i] - t[i-1]
-            IH[i] = IH[i-1] + self._C * dt**self._alpha * tau ** self._beta
+        IH = np.zeros_like(t)
+        IH[1:] = np.cumsum(self._C * dt**self._alpha * tau**self._beta)
 
         return IH
     
@@ -174,10 +174,10 @@ class PowerLawModel:
 
         IH = np.zeros_like(t)
 
-        for i in range(1, len(t)):
-            tau = self._mu * G[i-1]
-            dt = t[i] - t[i-1]
-            IH[i] = IH[i-1] + self._C * t[i]**(self._alpha-1) * tau**self._beta * dt
+        tau = np.squeeze(self._mu * G[:-1])
+        dt = np.diff(t)
+        t_power = t[1:]**(self._alpha-1)
+        IH[1:] = np.cumsum(self._C * t_power * tau**self._beta * dt)
 
         return IH
 
@@ -194,13 +194,12 @@ class PowerLawModel:
         """
 
         IH = np.zeros_like(t)
-        partial_sum = 0
 
-        for i in range(1, len(t)):
-            tau = self._mu * G[i-1]
-            dt = t[i] - t[i-1]
-            partial_sum += dt * tau**(self._beta/self._alpha)
-            IH[i] = self._C * partial_sum**self._alpha
+
+        tau = np.squeeze(self._mu * G[:-1])
+        dt = np.diff(t)
+        partial_sum = np.cumsum(dt * tau**(self._beta/self._alpha))
+        IH[1:] = self._C * partial_sum**self._alpha
 
         return IH
     
@@ -216,15 +215,13 @@ class PowerLawModel:
         :rtype: NDArray
         """
 
-        IH = np.zeros_like(t)
         D0 = 0      # Initial dose (can be defined differently to account for damage accumulation)
-        partial_sum = D0
 
-        for i in range(1, len(t)):
-            tau = self._mu * G[i]
-            dt = t[i] - t[i-1]
-            partial_sum += dt * tau**(self._beta/self._alpha)
-            IH[i] = IH[i-1] + self._alpha * self._C * partial_sum**(self._alpha-1) * tau**(self._beta/self._alpha) * dt
+        tau = np.squeeze(self._mu * G[1:])
+        dt = np.diff(t)
+        partial_sum = np.cumsum(dt * tau**(self._beta/self._alpha)) + D0
+        IH = np.zeros_like(t)
+        IH[1:] = self._alpha * self._C * partial_sum**(self._alpha-1) * tau**(self._beta/self._alpha) * dt
 
         return IH
     
@@ -241,12 +238,13 @@ class PowerLawModel:
         """
 
         IH = np.zeros_like(t)
+        tau = np.squeeze(self._mu * G[1:])
+        dt = np.diff(t)
+        C_tau_beta = self._C * tau**self._beta
 
         for i in range(1, len(t)):
-            tau = self._mu * G[i]
-            dt = t[i] - t[i-1]
-            t_eff = (IH[i-1] / (self._C * tau**self._beta))**(1/self._alpha)
-            IH[i] = self._C * (t_eff + dt)**self._alpha * tau**self._beta
+            t_eff = (IH[i-1] / C_tau_beta[i-1])**(1/self._alpha)
+            IH[i] = C_tau_beta[i] * (t_eff + dt[i-1])**self._alpha
 
         return IH
     
