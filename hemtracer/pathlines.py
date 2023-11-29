@@ -88,7 +88,12 @@ class Pathline:
     The final integration time of the pathline.
     """
 
-    def __init__(self, t: List[float], x: List[Vector3]) -> None:
+    _reason_for_termination: str
+    """
+    The reason for termination of the pathline integration. Can be 'out of domain', 'not initialized', 'unexpected value', 'out of length', 'out of steps', 'stagnation', 'misc'.
+    """
+
+    def __init__(self, t: List[float], x: List[Vector3], reason_for_termination: str = 'misc') -> None:
         """
         Constructing an object creates its 'Position' attribute and stores it in attributes list.
 
@@ -96,6 +101,8 @@ class Pathline:
         :type t: List[float]
         :param x: The positions along the pathline.
         :type x: List[Vector3]
+        :param reason_for_termination: The reason for termination of the pathline integration, defaults to 'misc'.
+        :type reason_for_termination: str
         """
 
         if len(t) == 1:
@@ -104,6 +111,7 @@ class Pathline:
         self._t0 = t[0]
         self._tend = t[-1]
         self._attributes = [ PathlineAttribute(t, x, position_name) ]
+        self._reason_for_termination = reason_for_termination
 
     def get_position_attribute(self) -> PathlineAttribute:
         """
@@ -293,6 +301,16 @@ class Pathline:
         """
 
         return self._tend
+    
+    def get_reason_for_termination(self) -> str:
+        """
+        Returns the reason for termination of the pathline integration.
+
+        :return: The reason for termination.
+        :rtype: str
+        """
+
+        return self._reason_for_termination
 
 class PathlineTracker:
     """
@@ -330,7 +348,7 @@ class PathlineTracker:
     
     def compute_pathlines(self, x0: List[Vector3], 
                           initial_step: float = 0.001, min_step: float = 0.001, max_step: float = 0.002, 
-                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000) -> None:
+                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000, terminal_velocity: float = 1e-10) -> None:
         """
         Compute pathlines starting from a list of initial points. Stores pathlines in internal list. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the interpolate_to_pathlines function.
 
@@ -348,6 +366,8 @@ class PathlineTracker:
         :type max_length: float
         :param n_steps: The maximum number of steps to take. Defaults to 100000.
         :type n_steps: float
+        :param terminal_velocity: The velocity at which to stop integration. Defaults to 1e-10.
+        :type terminal_velocity: float
         """
 
         n_total = len(x0)
@@ -368,6 +388,7 @@ class PathlineTracker:
             tracer.SetIntegratorTypeToRungeKutta45()
             tracer.SetMaximumError(max_err)
             tracer.SetMaximumNumberOfSteps(n_steps)
+            tracer.SetTerminalSpeed(terminal_velocity)
             tracer.SetComputeVorticity(False)
             tracer.Update()
         
@@ -376,8 +397,27 @@ class PathlineTracker:
             point_data = tracer.GetOutput().GetPointData()
             t_np = np.array(point_data.GetArray(integration_time_name), copy=True)
 
+            # Find reason for termination.
+            reason_id = tracer.GetOutput().GetCellData().GetArray('ReasonForTermination').GetValue(0)
+
+            match reason_id:
+                case vtkStreamTracer.OUT_OF_DOMAIN:
+                    reason_for_termination = 'out of domain'
+                case vtkStreamTracer.NOT_INITIALIZED:
+                    reason_for_termination = 'not initialized'
+                case vtkStreamTracer.UNEXPECTED_VALUE:
+                    reason_for_termination = 'unexpected value'
+                case vtkStreamTracer.OUT_OF_LENGTH:
+                    reason_for_termination = 'out of length'
+                case vtkStreamTracer.OUT_OF_STEPS:
+                    reason_for_termination = 'out of steps'
+                case vtkStreamTracer.STAGNATION:
+                    reason_for_termination = 'stagnation'
+                case _:
+                    reason_for_termination = 'misc'
+
             # Store results in Pathline object.
-            pl = Pathline(list(t_np), list(points_np))
+            pl = Pathline(list(t_np), list(points_np), reason_for_termination)
 
             # Additionally store interpolated field data.
             for j in range(point_data.GetNumberOfArrays()):
