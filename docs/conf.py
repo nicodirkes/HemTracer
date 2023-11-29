@@ -5,19 +5,17 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+from curses import version
 import sys
 import os
-# sys.path.insert(0, os.path.abspath(os.path.join('..', 'hemtracer')))
 sys.path.insert(0, os.path.abspath('..'))
-# sys.path.insert(0, os.path.abspath(os.path.join('..', 'hemtracer')))
-# sys.path.insert(0, os.path.abspath(os.path.join('..', 'hemtracer', 'rbc_model')))
-# sys.path.insert(0, os.path.abspath(os.path.join('..', 'hemtracer', 'rbc_model', 'stress_based')))
-# sys.path.insert(0, os.path.abspath(os.path.join('..', 'hemtracer', 'rbc_model', 'strain_based')))
+from version import _version
 
 project = 'HemTracer'
 copyright = '2023, Nico Dirkes'
 author = 'Nico Dirkes'
-release = '0.2.1'
+version = _version
+release = version
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

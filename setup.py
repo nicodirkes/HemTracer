@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from setuptools import setup, find_packages
-
+from version import _version
 
 with open('README.md') as f:
     readme = f.read()
@@ -11,7 +11,7 @@ with open('LICENSE') as f:
 
 setup(
     name='hemtracer',
-    version='0.2.1',
+    version=_version,
     description='Lagrangian hemolysis post-processing for Eulerian CFD simulations',
     long_description=readme,
     author='Nico Dirkes',
