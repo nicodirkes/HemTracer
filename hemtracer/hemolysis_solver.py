@@ -90,7 +90,7 @@ class HemolysisSolver:
             pathline.add_attribute(t, G_rep, G_rep_name)
 
             i+=1
-            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.")
+            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
     def compute_hemolysis(self, powerlaw_model: PowerLawModel) -> None:
         """
@@ -118,7 +118,7 @@ class HemolysisSolver:
             pl.add_attribute(t, IH, powerlaw_model.get_attribute_name())
 
             i+=1
-            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.")
+            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
     
     def get_output(self, model: RBCModel | PowerLawModel) -> List[Dict[str, NDArray]]:

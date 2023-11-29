@@ -348,7 +348,8 @@ class PathlineTracker:
     
     def compute_pathlines(self, x0: List[Vector3], 
                           initial_step: float = 0.001, min_step: float = 0.001, max_step: float = 0.002, 
-                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000, terminal_velocity: float = 1e-10) -> None:
+                          max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000, terminal_velocity: float = 1e-10, 
+                          integrator: str = "RK45") -> None:
         """
         Compute pathlines starting from a list of initial points. Stores pathlines in internal list. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the interpolate_to_pathlines function.
 
@@ -368,6 +369,8 @@ class PathlineTracker:
         :type n_steps: float
         :param terminal_velocity: The velocity at which to stop integration. Defaults to 1e-10.
         :type terminal_velocity: float
+        :param integrator: The integrator to use. Options are "RK2", "RK4" and "RK45".  Defaults to "RK45".
+        :type integrator: str
         """
 
         n_total = len(x0)
@@ -384,12 +387,21 @@ class PathlineTracker:
             tracer.SetMaximumPropagation(max_length)
             tracer.SetMaximumIntegrationStep(max_step)
             tracer.SetInitialIntegrationStep(initial_step)
+            tracer.SetIntegrationStepUnit(vtkStreamTracer.CELL_LENGTH_UNIT)
             tracer.SetMinimumIntegrationStep(min_step)
-            tracer.SetIntegratorTypeToRungeKutta45()
             tracer.SetMaximumError(max_err)
             tracer.SetMaximumNumberOfSteps(n_steps)
             tracer.SetTerminalSpeed(terminal_velocity)
             tracer.SetComputeVorticity(False)
+
+            match integrator:
+                case "RK2":
+                    tracer.SetIntegratorTypeToRungeKutta2()
+                case "RK4":
+                    tracer.SetIntegratorTypeToRungeKutta4()
+                case "RK45":
+                    tracer.SetIntegratorTypeToRungeKutta45()
+
             tracer.Update()
         
             # Get the values in np format
@@ -427,7 +439,7 @@ class PathlineTracker:
 
             self._pathlines.append(pl)
             i = i+1
-            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.")
+            print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
     def interpolate_dv_to_pathlines(self, sampling_rate: float = 0.001, interpolation_scheme: str = 'previous') -> None:
         """
@@ -492,7 +504,7 @@ class PathlineTracker:
                                        field_name, interpolation_scheme=interpolation_scheme)
             
             i = i+1
-            print("...finished " + str(i) + " out of " + str(len(self._pathlines)) + " pathlines.")
+            print ("...finished " + str(i) + " out of " + str(len(self._pathlines)) + " pathlines.", end='\r')
 
     def get_pathlines(self) -> List[Pathline]:
         """
