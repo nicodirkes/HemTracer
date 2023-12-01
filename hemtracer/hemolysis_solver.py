@@ -64,6 +64,7 @@ class HemolysisSolver:
         :param model: Cell model to use.
         :type model: RBCModel
         """
+
         i=0
         pathlines = self._pathline_tracker.get_pathlines()
         n_total = len(pathlines)
@@ -91,6 +92,7 @@ class HemolysisSolver:
 
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
+
 
     def compute_hemolysis(self, powerlaw_model: PowerLawModel) -> None:
         """
@@ -120,7 +122,7 @@ class HemolysisSolver:
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
-    
+
     def get_output(self, model: RBCModel | PowerLawModel) -> List[Dict[str, NDArray]]:
         """
         Obtain hemolysis solutions along pathlines after they have been computed. Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and output variable.
