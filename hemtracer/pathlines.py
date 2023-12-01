@@ -349,7 +349,7 @@ class PathlineTracker:
     def compute_pathlines(self, x0: List[Vector3], 
                           initial_step: float = 0.001, min_step: float = 0.001, max_step: float = 0.002, 
                           max_err: float = 1e-3, max_length: float = 5.0, n_steps: int = 100000, terminal_velocity: float = 1e-10, 
-                          integrator: str = "RK45") -> None:
+                          integrator: str = "RK45", direction: str = "forward") -> None:
         """
         Compute pathlines starting from a list of initial points. Stores pathlines in internal list. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the interpolate_to_pathlines function.
 
@@ -371,6 +371,8 @@ class PathlineTracker:
         :type terminal_velocity: float
         :param integrator: The integrator to use. Options are "RK2", "RK4" and "RK45".  Defaults to "RK45".
         :type integrator: str
+        :param direction: The direction of integration. Options are "forward", "backward" and "both". Defaults to "forward".
+        :type direction: str
         """
 
         n_total = len(x0)
@@ -401,6 +403,16 @@ class PathlineTracker:
                     tracer.SetIntegratorTypeToRungeKutta4()
                 case "RK45":
                     tracer.SetIntegratorTypeToRungeKutta45()
+                
+            match direction:
+                case "forward":
+                    tracer.SetIntegrationDirectionToForward()
+                case "backward":
+                    tracer.SetIntegrationDirectionToBackward()
+                case "both":
+                    tracer.SetIntegrationDirectionToBoth()
+                case _:
+                    raise ValueError("Unknown direction " + direction + ". Options are 'forward', 'backward', and 'both'.")
 
             tracer.Update()
         
@@ -408,6 +420,11 @@ class PathlineTracker:
             points_np = np.array(tracer.GetOutput().GetPoints().GetData(), copy=True)
             point_data = tracer.GetOutput().GetPointData()
             t_np = np.array(point_data.GetArray(integration_time_name), copy=True)
+
+            # Ensure correct order of points and integration times.
+            idx = np.argsort(t_np)
+            t_np = t_np[idx]
+            points_np = points_np[idx,:] # sort points accordingly
 
             # Find reason for termination.
             reason_id = tracer.GetOutput().GetCellData().GetArray('ReasonForTermination').GetValue(0)
@@ -435,7 +452,14 @@ class PathlineTracker:
             for j in range(point_data.GetNumberOfArrays()):
                 name = point_data.GetArrayName(j)
                 if name != integration_time_name: # integration time is already stored
-                    pl.add_attribute(t_np, np.array(point_data.GetArray(name), copy=True), name)
+                    
+                    # sort array data accordingly
+                    array_data = np.array(point_data.GetArray(name), copy=True)
+                    if array_data.ndim == 1:
+                        array_data = array_data[idx]
+                    else:
+                        array_data = array_data[idx,:]
+                    pl.add_attribute(t_np, array_data, name)
 
             self._pathlines.append(pl)
             i = i+1
