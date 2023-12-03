@@ -5,14 +5,17 @@ This guide provides a brief overview of the package and its usage. For more deta
 
 Installation
 -------------------------------------
-The recommended way to install is to clone the `GitHub repository <https://github.com/nicodirkes/HemTracer>`_ and install the package using pip:
+The recommended way to install HemTracer is to clone the `GitHub repository <https://github.com/nicodirkes/HemTracer>`_ and install the package using a virtual environment.
 
 .. code-block:: bash
 
     git clone https://github.com/nicodirkes/HemTracer.git
     cd HemTracer
-    python3 -m pip install .
+    python3.12 -m venv .env
+    source .env/bin/activate
+    python3.12 -m pip install .
 
+The virtual environment has to be activated whenever you want to use HemTracer.
 Note that the package requires Python 3.12 due to typing functionality. In addition, the package requires the following dependencies:
 
 - `numpy <https://numpy.org/>`_
