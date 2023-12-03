@@ -6,7 +6,7 @@ from collections.abc import Callable
 from collections import namedtuple
 from enum import Enum
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Dict
 
 MorphologyCoefficients = namedtuple('MorphologyCoefficients', ['f1', 'f2', 'f3', 'f2t', 'f3t'])
 
@@ -30,9 +30,9 @@ class StrainBasedModel(RBCModel):
     """Represents a strain-based blood damage model. These models employ a differential equation to explicitly resolve cell deformation in response to the acting flow forces. In the current implementation, this is constructed in particular for the Arora model (Arora et al. 2004) and all models derived from it, i.e., the simplified Eulerian model :cite:t:`pauli_transient_2013`, the full Eulerian morphology model (Dirkes et al. 2023) and the tank-treading model (Dirkes et al. 2023). In theory, however, also other strain-based models could be implemented as sub-classes. Since an ODE solver is required, these models offer additional configuration options for the solver and the initial condition.
     """
 
-    _initial_condition: NDArray
+    _initial_condition: Callable[[], NDArray]
     """
-    Initial condition for solution variable, i.e., shape of cells at the start of pathline integration.
+    Function that returns initial condition for solution variable, i.e., shape of cells at the start of pathline integration.
     """
 
     _method: str
@@ -88,17 +88,50 @@ class StrainBasedModel(RBCModel):
         """
         Set initial condition for strain-based model.
 
-        :param type: Type of initial condition, i.e., shape of cells at the start of the pathline. Currently supported: undeformed, steadyShear. 'undeformed' represents an undeformed, i.e., perfectly spherical cell. 'steadyShear' represents the steady state for a simple shear flow. The shear rate is computed using the second invariant of the strain tensor at the initial position. Defaults to 'undeformed'.
+        :param type: Type of initial condition, i.e., shape of cells at the start of the pathline. Currently supported: undeformed, steadyShear, specificShear. 'undeformed' represents an undeformed, i.e., spherical cell. 'steadyShear' represents the steady state for a simple shear flow. The shear rate is computed using the second invariant of the strain tensor at the initial position. 'specificShear' requires a second word that describes the attribute to take the specific shear rate from, e.g., 'specificShear Geff'. It then deforms the cell to correspond to that particular scalar shear rate at the beginning. Defaults to 'undeformed'.
         :type type: str
+        :param val: Value for initial condition, if applicable. Defaults to None.
+        :type val: float, optional
         """
 
-        match type:
+        type_split = type.split()
+        type_str = type_split[0]
+        match type_str:
             case 'undeformed':
-                self._initial_condition = self._initial_condition_undeformed()
+                self._initial_condition = self._initial_condition_undeformed
             case 'steadyShear':
-                self._initial_condition = self._initial_condition_steady()
+                self._initial_condition = self._initial_condition_steadyShear
+            case 'specificShear':
+                if len(type_split) == 1:
+                    raise ValueError('specificShear initial condition requires an additional argument specifying the name of the attribute to use for shear rate.')
+                attribute_name = type_split[1]
+                self._initial_condition = lambda : self._initial_condition_shearRateAttribute(attribute_name)
             case _:
                 raise ValueError('Initial condition type unknown.')
+            
+    def _initial_condition_steadyShear(self) -> NDArray:
+        """
+        Set initial condition for steady shear. Has to be implemented by subclasses to be usable.
+
+        :return: A vector of values describing a cell in steady shear in the model.
+        :rtype: NDArray
+        :raises NotImplementedError: If steady shear initial condition is not implemented in this cell model.
+        """
+
+        return self._initial_condition_shear(self._get_shear_rate_flow(self._t0))
+
+    def _initial_condition_shear(self, G: float) -> NDArray:
+        """
+        Set initial condition for specific shear rate. Has to be implemented by subclasses to be usable.
+
+        :param G: Specific shear rate.
+        :type G: float
+        :return: A vector of values describing a cell in the model.
+        :rtype: NDArray
+        :raises NotImplementedError: If specific shear initial condition is not implemented in this cell model.
+        """
+
+        raise NotImplementedError('Specific shear initial condition not implemented in this cell model.')
 
     def configure_ODE_solver(self, method: str = 'RK45', 
                              atol: float = 1e-6, rtol: float = 1e-5,
@@ -134,7 +167,7 @@ class StrainBasedModel(RBCModel):
         :rtype: Tuple[NDArray, NDArray]
         """
 
-        result = solve_ivp(self._RHS, (self._t0, self._tend), self._initial_condition, method=self._method, atol=self._atol, rtol=self._rtol, first_step=self._first_step, max_step=self._max_step)
+        result = solve_ivp(self._RHS, (self._t0, self._tend), self._initial_condition(), method=self._method, atol=self._atol, rtol=self._rtol, first_step=self._first_step, max_step=self._max_step)
         t = np.transpose(result.t)
         sol = np.transpose(result.y)
         Geff = self._compute_Geff_from_sol(sol)
@@ -152,17 +185,28 @@ class StrainBasedModel(RBCModel):
 
         raise NotImplementedError('Undeformed initial condition not implemented in this cell model.')
     
-    def _initial_condition_steady(self) -> NDArray:
-        """
-        Set initial condition for steady shear. Has to be implemented by subclasses to be usable.
-
-        :return: A vector of values describing a cell in steady shear in the model.
-        :rtype: NDArray
-        :raises NotImplementedError: If steady shear initial condition is not implemented in this cell model.
-        """
-
-        raise NotImplementedError('Steady shear initial condition not implemented in this cell model.')
     
+    def _initial_condition_shearRateAttribute(self, attribute: str) -> NDArray:
+        """
+        Set initial condition for specific shear rate from a pathline attribute.
+
+        :param G: Name of attribute that describes shear rate to use at initial time.
+        :type G: str
+        :return: A vector of values describing a cell in the model.
+        :rtype: NDArray
+        """
+
+        if self._init is None:
+            raise AttributeError('Initial values not given. Shear rate attribute initial condition cannot be applied.')
+        
+        if not attribute in self._init:
+            raise AttributeError('Initial value attribute ' + attribute + ' not found on pathline!')
+
+        G = self._init[attribute]
+
+        return self._initial_condition_shear(G)
+    
+
     def _compute_Geff_from_sol(self, sol: NDArray) -> NDArray:
         """
         Compute effective shear rate from solution of strain-based model.
@@ -251,19 +295,30 @@ class StrainBasedModel(RBCModel):
 
         raise NotImplementedError('RHS has to be implemented in subclasses.')
     
-    def _compute_steady_state_shear(self, t: float) -> Tuple[Vector3, Tensor3]:
+    def _get_shear_rate_flow(self, t: float) -> float:
         """
-        Computes an approximate steady state. This is done by reducing the three-dimensional strain tensor to a scalar shear rate first using the second tensor invariant. Then the steady state for a simple shear flow of that intensity is computed. The equations for steady state in shear flow with f2 != f3 have been derived by myself on a piece of paper. They are not published anywhere. The equations for f2 = f3 are available in Arora et al. (2004).
+        Compute shear rate from flow field at time t.
 
         :param t: Time.
         :type t: float
+        :return: Shear rate.
+        :rtype: float
+        """
+
+        E = self._compute_strain_tensor(t)
+        G = self._compute_shear_rate_second_invariant(E)
+
+        return G
+    
+    def _compute_steady_state_shear(self, G: float) -> Tuple[Vector3, Tensor3]:
+        """
+        Computes an approximate steady state for a simple shear flow of the given intensity. The equations for steady state in shear flow with f2 != f3 have been derived by myself on a piece of paper. They are not published anywhere. The equations for f2 = f3 are available in Arora et al. (2004).
+
+        :param G: Shear rate.
+        :type G: float
         :return: Tuple of eigenvalues of morphology tensor and basis vectors of morphology tensor.
         :rtype: Tuple[Vector3, Tensor3]
         """
-
-        # Compute shear rate.
-        E = self._compute_strain_tensor(t)
-        G = self._compute_shear_rate_second_invariant(E)
 
         f1 = self._coeffs.f1
         f2 = self._coeffs.f2
@@ -381,15 +436,17 @@ class MorphologyTensorFormulation(StrainBasedModel):
 
         return np.array([1, 1, 1, 0, 0, 0])
     
-    def _initial_condition_steady(self) -> NDArray:
+    def _initial_condition_shear(self, G: float) -> NDArray:
         """
-        Set initial condition for steady shear in morphology tensor models.
+        Set initial condition for shear rate in morphology tensor models.
 
-        :return: Initial condition for steady shear.
+        :param G: Shear rate.
+        :type G: float
+        :return: Initial condition for shear.
         :rtype: NDArray
         """
 
-        lamb, Q = self._compute_steady_state_shear(self._t0)
+        lamb, Q =  self._compute_steady_state_shear(G)
         S = np.matmul(Q, np.matmul(np.diag(lamb), Q.T)) # S = Q * lambda * Q^T (eigendecomposition)
         return self._pack_morphology(S)
     
@@ -561,15 +618,17 @@ class AroraFullEig(MorphologyEigFormulation):
         Q_lin = Q.reshape((9,))
         return np.concatenate((lamb, Q_lin))
     
-    def _initial_condition_steady(self) -> Vector12:
+    def _initial_condition_shear(self, G: float) -> Vector12:
         """
         Set initial condition to steady shear state.
 
+        :param G: Shear rate.
+        :type G: float
         :return: Steady shear state, expressed in model variables.
         :rtype: Vector12
         """
 
-        lamb, Q = self._compute_steady_state_shear(self._t0)
+        lamb, Q = self._compute_steady_state_shear(G)
         Q_lin = Q.reshape((9,))
         return np.concatenate((lamb, Q_lin))
     
@@ -683,15 +742,17 @@ class TankTreading(MorphologyEigFormulation):
         lamb = np.array([1, 1, 1])
         return lamb
     
-    def _initial_condition_steady(self) -> Vector3:
+    def _initial_condition_shear(self, G: float) -> Vector3:
         """
         Set initial condition to steady shear state.
 
+        :param G: Shear rate.
+        :type G: float
         :return: Steady shear state, expressed in model variables.
         :rtype: Vector3
         """
 
-        lamb, Q = self._compute_steady_state_shear(self._t0)
+        lamb, Q = self._compute_steady_state_shear(G)
         return lamb
     
     def _RHS(self, t: float, y: Vector3) -> Vector3:
@@ -916,7 +977,12 @@ class TankTreadingRotationCorrection(TankTreading):
 
         return 'tank-treading-pathline'
     
-    def set_time_dependent_quantitites(self, t0: float, tend: float, dv: Callable[[float], Vector9] | None = None, omega: Callable[[float], Vector3] | None = None, x: Callable[[float], Vector3] | None = None, v: Callable[[float], Vector3] | None = None) -> None:
+    def set_time_dependent_quantitites(self, t0: float, tend: float, 
+                                       dv: Callable[[float], Vector9] | None = None, 
+                                       omega: Callable[[float], Vector3] | None = None, 
+                                       x: Callable[[float], Vector3] | None = None, 
+                                       v: Callable[[float], Vector3] | None = None, 
+                                       init: Dict[str, float] | None = None) -> None:
         """
         Set time-dependent quantities for the cell model. Overrides superclass method to include position measure x and velocity v.
 
@@ -931,12 +997,14 @@ class TankTreadingRotationCorrection(TankTreading):
         :param x: Time-dependent position measure, e.g., absolute coordinates or distance from rotational center. 
         :type x: Callable[[float], Vector3]
         :param v: Time-dependent velocity.
-        :type v: Callable[[float], Vector3
+        :type v: Callable[[float], Vector3]
+        :param init: Dict with initial values for attributes on pathline, only required for specific shear initial condition.
+        :type init: Dict[str, float]
         :raises ValueError: If position measure x or velocity v is not provided.
         """
         
         # Set same quantities as superclass.
-        super().set_time_dependent_quantitites(t0, tend, dv, omega, x, v)
+        super().set_time_dependent_quantitites(t0, tend, dv, omega, x, v, init)
 
         # Additionally set position measure and velocity.
         if x is None:

@@ -2,7 +2,7 @@
 from __future__ import annotations
 import numpy as np
 from collections.abc import Callable
-from typing import Tuple
+from typing import Tuple, Dict
 from numpy.typing import NDArray
 from hemtracer._definitions import Vector3, Vector9, Vector12, Tensor3
 
@@ -32,11 +32,17 @@ class RBCModel:
     (required for all currently implemented models except stress-based bludszuweit).
     """
 
+    _init: Dict[str, float] | None
+    """
+    Dict that holds initial values for various attributes on the pathline. May be used for initial conditions.
+    """
+
     def set_time_dependent_quantitites(self, t0: float, tend: float, 
                                        dv: Callable[[float],Vector9] | None = None, 
                                        omega: Callable[[float],Vector3] | None = None, 
                                        x: Callable[[float], Vector3] | None = None,
-                                       v: Callable[[float], Vector3] | None = None) -> None:
+                                       v: Callable[[float], Vector3] | None = None,
+                                       init: Dict[str, float] | None = None) -> None:
         """
         Set time-dependent quantities for scalar shear rate model and check if all required quantities are there. Start and end time as well as velocity gradient are always required. If omega is not defined, it is set to zero, assuming a stationary frame of reference. The tank-treading model with pathline additionally requires x and v. This is handled by :class:`hemtracer.hemolysis_solver.HemolysisSolver`.
 
@@ -53,6 +59,8 @@ class RBCModel:
         :type x: Callable[[float],Vector3]
         :param v: Velocity as a function of pathline time. Only required for tank-treading with pathline correction.
         :type v: Callable[[float],Vector3]
+        :param init: Dict with initial values for attributes on pathline, only required for specific shear initial condition.
+        :type init: Dict[str, float]
         """
 
         """Sanity checks."""
@@ -77,6 +85,7 @@ class RBCModel:
         self._tend = tend
         self._dv = dv
         self._omega = omega
+        self._init = init
 
     def _compute_strain_tensor(self, t: float) -> Tensor3:
         """
