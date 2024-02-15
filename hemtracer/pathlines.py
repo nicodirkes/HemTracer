@@ -427,23 +427,26 @@ class PathlineTracker:
             points_np = points_np[idx,:] # sort points accordingly
 
             # Find reason for termination.
-            reason_id = tracer.GetOutput().GetCellData().GetArray('ReasonForTermination').GetValue(0)
-
-            match reason_id:
-                case vtkStreamTracer.OUT_OF_DOMAIN:
-                    reason_for_termination = 'out of domain'
-                case vtkStreamTracer.NOT_INITIALIZED:
-                    reason_for_termination = 'not initialized'
-                case vtkStreamTracer.UNEXPECTED_VALUE:
-                    reason_for_termination = 'unexpected value'
-                case vtkStreamTracer.OUT_OF_LENGTH:
-                    reason_for_termination = 'out of length'
-                case vtkStreamTracer.OUT_OF_STEPS:
-                    reason_for_termination = 'out of steps'
-                case vtkStreamTracer.STAGNATION:
-                    reason_for_termination = 'stagnation'
-                case _:
-                    reason_for_termination = 'misc'
+            reason_array = tracer.GetOutput().GetCellData().GetArray('ReasonForTermination')
+            if reason_array is None:
+                reason_for_termination = 'misc'
+            else:
+                reason_id = reason_array.GetValue(0)
+                match reason_id:
+                    case vtkStreamTracer.OUT_OF_DOMAIN:
+                        reason_for_termination = 'out of domain'
+                    case vtkStreamTracer.NOT_INITIALIZED:
+                        reason_for_termination = 'not initialized'
+                    case vtkStreamTracer.UNEXPECTED_VALUE:
+                        reason_for_termination = 'unexpected value'
+                    case vtkStreamTracer.OUT_OF_LENGTH:
+                        reason_for_termination = 'out of length'
+                    case vtkStreamTracer.OUT_OF_STEPS:
+                        reason_for_termination = 'out of steps'
+                    case vtkStreamTracer.STAGNATION:
+                        reason_for_termination = 'stagnation'
+                    case _:
+                        reason_for_termination = 'misc'
 
             # Store results in Pathline object.
             pl = Pathline(list(t_np), list(points_np), reason_for_termination)
