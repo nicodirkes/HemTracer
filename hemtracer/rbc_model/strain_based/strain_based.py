@@ -612,7 +612,7 @@ class AroraFullEig(MorphologyEigFormulation):
         """
 
         # Add perturbation to avoid singularity.
-        eps = 1e-3
+        eps = 1e-4
         lamb = np.array([1.0-eps, 1.0, 1.0+eps])
         Q = np.eye(3) 
         Q_lin = Q.reshape((9,))
