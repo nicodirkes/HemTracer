@@ -278,10 +278,14 @@ class EulerianFlowField:
         threshold.SetLowerThreshold(rf_rot-0.1)
         threshold.SetUpperThreshold(rf_rot+0.1)
         threshold.Update()
-        
-        r_data_rf = threshold.GetOutput().GetPointData().GetArray(self._mrf_r_name)
-        pointId_data_rf = np.array(threshold.GetOutput().GetPointData().GetArray(vtkOrigPointIds_name))
-        vel_data_rf = threshold.GetOutput().GetPointData().GetArray(self._velocity_name)
+
+        rotating_point_data = threshold.GetOutput().GetPointData()
+
+        if rotating_point_data.GetNumberOfArrays() == 0:
+            raise ValueError("No cells found for reference frame ID {} in element data field {} of file {}".format(rf_rot, rf_name, self._vtk_flow_field_name))
+        r_data_rf = rotating_point_data.GetArray(self._mrf_r_name)
+        pointId_data_rf = np.array(rotating_point_data.GetArray(vtkOrigPointIds_name))
+        vel_data_rf = rotating_point_data.GetArray(self._velocity_name)
 
         # Transform velocity.
         r = np.array(r_data_rf, copy=False)
