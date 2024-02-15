@@ -721,6 +721,24 @@ class TankTreading(MorphologyEigFormulation):
     Represents the tank-treading cell deformation model (see :ref:`tanktreading-model`), 
     """
 
+    _maxIt: int
+    """
+    Maximum number of iterations for steady state orientation.
+    """
+
+    _tol: float
+    """
+    Tolerance for convergence of steady state orientation.
+    """
+
+    def __init__(self) -> None:
+        """
+        Arora coefficients (Arora et al. 2004) are used by default.
+        """
+
+        super().__init__()
+        self.configure_steadyOrientation_solver()
+
     def get_name(self) -> str:
         """
         Get name of blood damage model.
@@ -730,6 +748,19 @@ class TankTreading(MorphologyEigFormulation):
         """
 
         return 'tank-treading'
+    
+    def configure_steadyOrientation_solver(self, tol: float = 1e-5, maxIt: int = 100) -> None:
+        """
+        Set parameters for steady state orientation computation.
+
+        :param tol: Tolerance for convergence. Defaults to 1e-5.
+        :type tol: float
+        :param maxIt: Maximum number of iterations. Defaults to 100.
+        :type maxIt: int
+        """
+
+        self._tol = tol
+        self._maxIt = maxIt
     
     def _initial_condition_undeformed(self) -> Vector3:
         """
@@ -831,7 +862,7 @@ class TankTreading(MorphologyEigFormulation):
 
         return thetaStar
 
-    def _getSteadyOrientation3D(self, lamb: Vector3, E: Tensor3, W: Tensor3, tol: float=1e-5) -> Tensor3:
+    def _getSteadyOrientation3D(self, lamb: Vector3, E: Tensor3, W: Tensor3) -> Tensor3:
         """
         Computes the steady orientation for a 3D ellipsoid. The algorithm is presented in Dirkes et al. (2023). 
         Warning: in contrast to the paper, we employ the opposite order of eigenvalues, i.e., lambda_1 <= lambda_2 <= lambda_3. 
@@ -843,14 +874,11 @@ class TankTreading(MorphologyEigFormulation):
         :type E: Tensor3
         :param W: Vorticity tensor.
         :type W: Tensor3
-        :param tol: Tolerance for convergence. Defaults to 1e-5.
-        :type tol: float
         :return: Orientation tensor.
         :rtype: Tensor3
         """
 
         it = 0
-        maxIt = 100
 
         # Sort eigenvalues in ascending order and switch eigenvectors accordingly.
         idx_l = np.argsort(lamb)
@@ -866,7 +894,7 @@ class TankTreading(MorphologyEigFormulation):
 
         converged = False
 
-        while (not converged) and (it < maxIt):
+        while (not converged) and (it < self._maxIt):
 
             it += 1
 
@@ -908,7 +936,7 @@ class TankTreading(MorphologyEigFormulation):
                 Q = np.matmul(Q, R)
 
                 # Check convergence.
-                converged = converged and np.abs(thetaStar) <= tol
+                converged = converged and np.abs(thetaStar) <= self._tol
 
         return Q
 
