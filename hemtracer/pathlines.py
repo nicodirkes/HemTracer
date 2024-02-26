@@ -1,6 +1,5 @@
 from __future__ import annotations
-from ctypes import Array
-from math import e
+import csv
 from hemtracer.eulerian_flow_field import EulerianFlowField
 from vtk import vtkStreamTracer, vtkDoubleArray, vtkPolyData, vtkPolyDataWriter, vtkPoints, vtkIntArray, vtkCellArray, vtkPolyLine
 from vtkmodules.util.numpy_support import numpy_to_vtk
@@ -9,6 +8,7 @@ import numpy as np
 from typing import List, Dict, Any, Tuple
 from numpy.typing import ArrayLike, NDArray
 from hemtracer._definitions import Vector3, vtk_point_assoc
+import pandas as pd
 
 
 integration_time_name = 'IntegrationTime'   # integration time along pathline
@@ -312,24 +312,434 @@ class Pathline:
 
         return self._reason_for_termination
 
-class PathlineTracker:
+class PathlineCollection:
     """
-    Class for tracking pathlines in a flow field. Uses VTK's vtkStreamTracer to compute pathlines. Stores pathlines as :class:`Pathline` objects. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the :func:`interpolate_to_pathlines` function.
+    Class for storing a collection of pathlines. 
     """
 
-    _velocity_name: str
+    _pathlines: List[Pathline] = []
     """
-    The name of the velocity field to use for pathline integration.
+    A list of Pathline objects.
+    """
+
+    _velocity_name: str | None = None
+    """
+    The name of the velocity field.
+    """
+
+    _velocity_gradient_name: str | None = None
+    """
+    The name of the velocity gradient field.
+    """
+
+    _omega_frame_name: str | None = None
+    """
+    The name of the angular velocity vector of the frame of reference.
+    """
+
+    _distance_center_name: str | None = None
+    """
+    The name of the field for the orthogonal distance to the center of rotation.
+    """
+
+    def get_pathlines(self) -> List[Pathline]:
+        """
+        Returns the current list of pathlines.
+
+        :return: A list of pathlines.
+        :rtype: List[Pathline]
+        """
+
+        return self._pathlines
+    
+    def get_attribute(self, attribute_name: str) -> List[Dict[str, NDArray]]:
+        """
+        Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and attribute, respectively.
+
+        :param attribute_name: The name of the attribute to return.
+        :type attribute: str
+        :return: A list of dictionaries.
+        :rtype: List[Dict[str, NDArray]]
+        """
+
+        dict_list = []
+        for pl in self._pathlines:
+            attribute = pl.get_attribute(attribute_name)
+            if attribute is None:
+                raise AttributeError('No attribute with name ' + attribute_name + ' found on pathline.')
+            dict_list.append({'t': attribute.t, 'y': attribute.val})
+
+        return dict_list
+    
+    def get_name_velocity(self) -> str | None:
+        """
+        Returns the name of the velocity field used for pathline integration.
+
+        :return: The name of the velocity field.
+        :rtype: str
+        """
+
+        return self._velocity_name
+
+    def get_name_velocity_gradient(self) -> str | None:
+        """
+        Returns the name of the attribute that contains the velocity gradient. None if not available.
+
+        :return: The name of the attribute.
+        :rtype: str | None
+        """
+
+        return self._velocity_gradient_name
+    
+    def get_name_omega_frame(self) -> str | None:
+        """
+        Returns the name of the attribute that describes the angular velocity vector of the frame of reference. None if not available.
+
+        :return: The name of the attribute.
+        :rtype: str | None
+        """
+
+        return self._omega_frame_name
+    
+    def get_name_distance_center(self) -> str | None:
+        """
+        Returns the name of the attribute that describes the orthogonal distance to the center of rotation. None if not available.
+
+        :return: The name of the attribute.
+        :rtype: str | None
+        """
+
+        return self._distance_center_name
+    
+    def to_file(self, filename: str, attribute_names: List[str] | None = None) -> None:
+        """
+        Write pathlines to file. If attribute names are specified, only those attributes are written to file. Otherwise, all attributes are written to file.
+
+        Interpolates all attributes to the same time points (those of the 'Position' attribute) before writing to file.
+
+        Supports writing to CSV, npz, and VTK files. In case of CSV and VTK, it is assumed that all pathlines contain the same attributes, as this is required by the file format (every point must have the same number of attributes). If you want to write pathlines with different attributes to file, there are two options: (1) Write to npz file, which does not require all pathlines to have the same attributes. (2) Instantiate multiple PathlineTracker objects, each with a different set of attributes, and write each one to a separate file.
+        In case of npz, the attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
+
+        :param filename: The name of the file to write to, including path and extension. Supported extensions are .csv, .npz, and .vtk.
+        :type filename: str
+        :param attribute_names: A list of attribute names to write to file. If None, all attributes are written to file (default).
+        :type attribute_names: List[str], optional
+        """
+        
+        print('Writing pathlines to file ' + filename + '...')
+        
+        pathlines = [ pathline.unify_attributes(attribute_names) for pathline in self._pathlines ]
+
+        # Determine appropriate writer.
+        ext = filename.split('.')[-1]
+        match ext:
+            case 'csv':
+                writer = self._write_csv
+            case 'npz':
+                writer = self._write_npz
+            case 'vtk':
+                writer = self._write_vtk
+            case _:
+                raise ValueError('Unsupported file extension. Supported extensions are .csv, .npz, and .vtk.')
+        
+        # Write to file.
+        writer(filename, pathlines)
+
+    def _write_csv(self, filename: str, pathlines: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to CSV file. It is assumed that all pathlines contain the same attributes.
+
+        :param filename: The name of the file to write to, including path and extension.
+        :type filename: str
+        :param pathlines: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type pathlines: List[Tuple[NDArray,List[str]]]
+        """
+        
+        # Store to check if all pathlines contain same attributes.
+        attribute_names_ref = pathlines[0][1]
+
+        # Write to file.
+        with open(filename, 'w') as f:
+            
+            # Write header.
+            f.write('"PathlineID"')
+            f.write('"t"') # time column
+            for attribute_name in attribute_names_ref:
+                f.write(',"' + attribute_name + '"')
+            f.write('\n')
+
+            # Write data.
+            for pathline in pathlines:
+                if pathline[1] != attribute_names_ref:
+                    raise ValueError('Not all pathlines contain the same attributes. Cannot write to CSV file.')
+                
+                vals = pathline[0]
+                for i in range(vals.shape[0]):
+                    f.write(str(i))
+                    f.write(str(vals[i,0]))
+                    for j in range(1,vals.shape[1]):
+                        f.write(',' + str(vals[i,j]))
+                    f.write('\n')
+    
+    def _write_npz(self, filename: str, pathlines: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to npz file. It is not assumed that all pathlines contain the same attributes. The attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
+
+        :param filename: The name of the file to write to.
+        :type filename: str
+        :param pathlines: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type pathlines: List[Tuple[NDArray,List[str]]]
+        """
+
+        # Create interleaved list of attribute values and names.
+        attribute_value_name_list = [val for pair in pathlines for val in pair]
+
+        # Write to file.
+        np.savez(filename, *attribute_value_name_list)
+
+    def _write_vtk(self, filename: str, pathlines: List[Tuple[NDArray,List[str]]]) -> None:
+        """
+        Write pathlines to VTK file. All pathlines are written to the same VTK file. They are identified by the attribute 'PathlineID', which is stored as a point data array. 
+
+        :param filename: The name of the file to write to.
+        :type filename: str
+        :param pathlines: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
+        :type pathlines: List[Tuple[NDArray,List[str]]]
+        """
+
+        # Create a cell array to store the lines in and add the lines to it
+        cells = vtkCellArray()
+
+        # Create a vtkPoints object and store the points in it
+        points = vtkPoints()
+
+        # Create a polydata to store everything
+        polyData = vtkPolyData()
+
+        idx = 0
+
+        for pl_attribute in pathlines:
+
+            # Get pathline attributes.
+            x = pl_attribute[0][:,1:4]
+            
+            # Create points.
+            for point in x:
+                points.InsertNextPoint(point)
+            
+            # Create pathline.
+            n = len(x)
+            polyLine = vtkPolyLine()
+            polyLine.GetPointIds().SetNumberOfIds(n)
+
+            for (i, j) in enumerate(np.arange(idx, idx+n)):
+                polyLine.GetPointIds().SetId(i, j)
+            
+            cells.InsertNextCell(polyLine)
+            idx = idx+n
+        
+        # Add everything to the dataset
+        polyData.SetPoints(points)
+        polyData.SetLines(cells)
+
+        # Add pathline ID as point data array.
+        pathline_id_array = vtkIntArray()
+        pathline_id_array.SetNumberOfComponents(0)
+        pathline_id_array.SetName('PathlineID')
+        for i in range(len(pathlines)):
+            pathline_id_array.InsertNextValue(i)
+        polyData.GetCellData().AddArray(pathline_id_array)
+
+        # Add attributes as point data arrays.
+        attribute_names = pathlines[0][1] # assume all pathlines have same attributes
+      
+        # Aggregate attribute values into array by component.
+        attribute_values = pathlines[0][0]
+        for pl_attributes in pathlines[1:]:
+            if pl_attributes[1] != attribute_names:
+                raise ValueError('Not all pathlines contain the same attributes. Cannot write to VTK file.')
+            attribute_values = np.append(attribute_values, pl_attributes[0], axis=0)
+        
+        # Add attribute values to polydata.
+        for (i, attribute_name) in enumerate(attribute_names):
+            attribute_array = numpy_to_vtk(attribute_values[:,i])
+            attribute_array.SetNumberOfComponents(0)
+            attribute_array.SetName(attribute_name)
+            polyData.GetPointData().AddArray(attribute_array)
+
+        # Write to file
+        writer = vtkPolyDataWriter()
+        writer.SetInputData(polyData)
+        writer.SetFileName(filename)
+        writer.Write()
+
+class PathlineReader (PathlineCollection):
+    """
+    Class for reading pathlines from file. Currently only supports reading from csv files.
+    """
+
+    def __init__(self, filename: str, id_name: str, t_name: str,
+                    posX_name: str, posY_name: str, posZ_name: str,
+                    velX_name:   str | None = None, velY_name:   str | None = None, velZ_name:   str | None = None,
+                    dvX_dx_name: str | None = None, dvX_dy_name: str | None = None, dvX_dz_name: str | None = None,
+                    dvY_dx_name: str | None = None, dvY_dy_name: str | None = None, dvY_dz_name: str | None = None,
+                    dvZ_dx_name: str | None = None, dvZ_dy_name: str | None = None, dvZ_dz_name: str | None = None,
+                    omegaX_name: str | None = None, omegaY_name: str | None = None, omegaZ_name: str | None = None,
+                    distance_center_name: str | None = None, idx: List[int] | None = None) -> None:
+        """
+        :param filename: The name of the file to read from.
+        :type filename: str
+        :param id_name: The name of the attribute containing the pathline IDs.
+        :type id_name: str
+        :param t_name: The name of the attribute containing the integration times.
+        :type t_name: str
+        :param posX_name: The name of the attribute containing the x-coordinates of the pathlines.
+        :type posX_name: str
+        :param posY_name: The name of the attribute containing the y-coordinates of the pathlines.
+        :type posY_name: str
+        :param posZ_name: The name of the attribute containing the z-coordinates of the pathlines.
+        :type posZ_name: str
+        :param velX_name: The name of the attribute containing the x-component of the velocity field. Defaults to None.
+        :type velX_name: str | None
+        :param velY_name: The name of the attribute containing the y-component of the velocity field. Defaults to None.
+        :type velY_name: str | None
+        :param velZ_name: The name of the attribute containing the z-component of the velocity field. Defaults to None.
+        :type velZ_name: str | None
+        :param dvX_dx_name: The name of the attribute containing the derivative of v_x w.r.t. x. Defaults to None.
+        :type dvX_dx_name: str | None
+        :param dvX_dy_name: The name of the attribute containing the derivative of v_x w.r.t. y. Defaults to None.
+        :type dvX_dy_name: str | None
+        :param dvX_dz_name: The name of the attribute containing the derivative of v_x w.r.t. z. Defaults to None.
+        :type dvX_dz_name: str | None
+        :param dvY_dx_name: The name of the attribute containing the derivative of v_y w.r.t. x. Defaults to None.
+        :type dvY_dx_name: str | None
+        :param dvY_dy_name: The name of the attribute containing the derivative of v_y w.r.t. y. Defaults to None.
+        :type dvY_dy_name: str | None
+        :param dvY_dz_name: The name of the attribute containing the derivative of v_y w.r.t. z. Defaults to None.
+        :type dvY_dz_name: str | None
+        :param dvZ_dx_name: The name of the attribute containing the derivative of v_z w.r.t. x. Defaults to None.
+        :type dvZ_dx_name: str | None
+        :param dvZ_dy_name: The name of the attribute containing the derivative of v_z w.r.t. y. Defaults to None.
+        :type dvZ_dy_name: str | None
+        :param dvZ_dz_name: The name of the attribute containing the derivative of v_z w.r.t. z. Defaults to None.
+        :type dvZ_dz_name: str | None
+        :param omegaX_name: The name of the attribute containing the x-component of the angular velocity vector of the frame of reference. Defaults to None.
+        :type omegaX_name: str | None
+        :param omegaY_name: The name of the attribute containing the y-component of the angular velocity vector of the frame of reference. Defaults to None.
+        :type omegaY_name: str | None
+        :param omegaZ_name: The name of the attribute containing the z-component of the angular velocity vector of the frame of reference. Defaults to None.
+        :type omegaZ_name: str | None
+        :param distance_center_name: The name of the attribute containing the orthogonal distance to the center of rotation. Defaults to None.
+        :type distance_center_name: str | None
+        :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read. Defaults to None.
+        :type idx: List[int] | None
+        """
+
+        print('Reading pathlines from file ' + filename + '...')
+
+        # set attribute names
+        pos_names = [posX_name, posY_name, posZ_name]
+
+        self._distance_center_name = distance_center_name
+
+        omega_names = [omegaX_name, omegaY_name, omegaZ_name]
+        if any(omega_names):
+            self._omega_frame_name = 'OmegaFrame'
+        
+        vel_names = [velX_name, velY_name, velZ_name]
+        if any(vel_names):
+            self._velocity_name = 'Velocity'
+
+        vel_grad_names = [dvX_dx_name, dvX_dy_name, dvX_dz_name, dvY_dx_name, dvY_dy_name, dvY_dz_name, dvZ_dx_name, dvZ_dy_name, dvZ_dz_name]
+        if any(vel_grad_names):
+            self._velocity_gradient_name = 'VelocityGradient'
+
+        # Determine appropriate reader.
+        ext = filename.split('.')[-1]
+        match ext:
+            case 'csv':
+                reader = self._read_csv
+            case _:
+                raise ValueError('Unsupported file extension. Supported extensions are .csv')
+        
+        # Read from file.
+        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx)
+    
+    def _read_csv(self, filename: str, id_name: str, t_name: str, 
+                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None) -> None:
+        """
+        Read pathlines from CSV file.
+
+        :param filename: The name of the file to read from.
+        :type filename: str
+        :param id_name: The name of the attribute containing the pathline IDs.
+        :type id_name: str
+        :param t_name: The name of the attribute containing the integration times.
+        :type t_name: str
+        :param pos_names: A list of attribute names containing the x, y, and z-coordinates of the pathlines.
+        :type pos_names: List[str]
+        :param vel_names: A list of attribute names containing the x, y, and z-components of the velocity field. If None, no velocity field is read.
+        :type vel_names: List[str|None]
+        :param vel_grad_names: A list of attribute names containing the derivatives of the velocity field. If None, no velocity gradient field is read.
+        :type vel_grad_names: List[str|None]
+        :param omega_names: A list of attribute names containing the components of the angular velocity vector of the frame of reference. If None, no angular velocity vector is read.
+        :type omega_names: List[str|None]
+        :param distance_center_name: The name of the attribute containing the orthogonal distance to the center of rotation. If None, no distance to center is read.
+        :type distance_center_name: str | None
+        :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read.
+        :type idx: List[int] | None
+        """
+
+        # Read from file.
+        pl_data = pd.read_csv(filename)
+
+        # Find unique pathline IDs.
+        pathline_ids = pl_data[id_name].unique()
+
+        # If indices are specified, only read those pathlines.
+        if idx is not None:
+            pathline_ids = pathline_ids[idx]
+
+        # Read data.
+        for pathline_id in pathline_ids:
+
+            # Get data for pathline.
+            pl_data_id = pl_data[pl_data[id_name] == pathline_id]
+            t = list(pl_data_id[t_name])
+            zeros = np.zeros(len(t))
+            x = list(np.asarray([ pl_data_id[name] if name else zeros for name in pos_names ]).T)
+
+            pl = Pathline(t, x)
+
+            # Add additional attributes. If attribute name is None, consider it as zero.
+            if self._velocity_name:
+                v = np.asarray([ pl_data_id[name] if name else zeros for name in vel_names ]).T
+                pl.add_attribute(t, v, self._velocity_name)
+            
+            if self._velocity_gradient_name:
+                dv = np.asarray([ pl_data_id[name] if name else zeros for name in vel_grad_names ]).T
+                pl.add_attribute(t, dv, self._velocity_gradient_name)
+            
+            if self._omega_frame_name:
+                omega = np.asarray([ pl_data_id[name] if name else zeros for name in omega_names ]).T
+                pl.add_attribute(t, omega, self._omega_frame_name)
+            
+            if self._distance_center_name:
+                d = pl_data_id[distance_center_name] if distance_center_name else zeros
+                pl.add_attribute(t, d, self._distance_center_name)
+
+            # Add pathline to collection.
+            self._pathlines.append(pl)
+
+
+class PathlineTracker (PathlineCollection):
+    """
+    Class for generating pathlines from a given flow field. Uses VTK's vtkStreamTracer to compute pathlines. Stores pathlines as :class:`Pathline` objects. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the :func:`interpolate_to_pathlines` function.
     """
 
     _flow_field: EulerianFlowField
     """
     The EulerianFlowField object in which to track pathlines.
-    """
-
-    _pathlines: List[Pathline] = []
-    """
-    A list of Pathline objects, empty if none have been computed yet.
     """
 
     def __init__(self, flow_field: EulerianFlowField) -> None:
@@ -374,6 +784,10 @@ class PathlineTracker:
         :param direction: The direction of integration. Options are "forward", "backward" and "both". Defaults to "forward".
         :type direction: str
         """
+
+        # Check if velocity field is available.
+        if self._velocity_name is None:
+            raise AttributeError("No velocity field found in flow field. Cannot compute pathlines.")
 
         n_total = len(x0)
         i = 0
@@ -532,16 +946,6 @@ class PathlineTracker:
             
             i = i+1
             print ("...finished " + str(i) + " out of " + str(len(self._pathlines)) + " pathlines.", end='\r')
-
-    def get_pathlines(self) -> List[Pathline]:
-        """
-        Returns the current list of pathlines.
-
-        :return: A list of pathlines.
-        :rtype: List[Pathline]
-        """
-
-        return self._pathlines
     
     def get_flow_field(self) -> EulerianFlowField:
         """
@@ -552,35 +956,6 @@ class PathlineTracker:
         """
 
         return self._flow_field
-
-    def get_attribute(self, attribute_name: str) -> List[Dict[str, NDArray]]:
-        """
-        Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and attribute, respectively.
-
-        :param attribute_name: The name of the attribute to return.
-        :type attribute: str
-        :return: A list of dictionaries.
-        :rtype: List[Dict[str, NDArray]]
-        """
-
-        dict_list = []
-        for pl in self._pathlines:
-            attribute = pl.get_attribute(attribute_name)
-            if attribute is None:
-                raise AttributeError('No attribute with name ' + attribute_name + ' found on pathline.')
-            dict_list.append({'t': attribute.t, 'y': attribute.val})
-
-        return dict_list
-    
-    def get_name_velocity(self) -> str:
-        """
-        Returns the name of the velocity field used for pathline integration.
-
-        :return: The name of the velocity field.
-        :rtype: str
-        """
-
-        return self._velocity_name
     
     def get_name_velocity_gradient(self) -> str | None:
         """
@@ -611,162 +986,3 @@ class PathlineTracker:
         """
 
         return self._flow_field.get_name_distance_center()
-
-    def to_file(self, filename: str, attribute_names: List[str] | None = None) -> None:
-        """
-        Write pathlines to file. If attribute names are specified, only those attributes are written to file. Otherwise, all attributes are written to file.
-
-        Interpolates all attributes to the same time points (those of the 'Position' attribute) before writing to file.
-
-        Supports writing to CSV, npz, and VTK files. In case of CSV and VTK, it is assumed that all pathlines contain the same attributes, as this is required by the file format (every point must have the same number of attributes). If you want to write pathlines with different attributes to file, there are two options: (1) Write to npz file, which does not require all pathlines to have the same attributes. (2) Instantiate multiple PathlineTracker objects, each with a different set of attributes, and write each one to a separate file.
-        In case of npz, the attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
-
-        :param filename: The name of the file to write to, including path and extension. Supported extensions are .csv, .npz, and .vtk.
-        :type filename: str
-        :param attribute_names: A list of attribute names to write to file. If None, all attributes are written to file (default).
-        :type attribute_names: List[str], optional
-        """
-        
-        print('Writing pathlines to file ' + filename + '...')
-        
-        attributes = [ pathline.unify_attributes(attribute_names) for pathline in self._pathlines ]
-
-        # Determine appropriate writer.
-        ext = filename.split('.')[-1]
-        match ext:
-            case 'csv':
-                writer = self._write_csv
-            case 'npz':
-                writer = self._write_npz
-            case 'vtk':
-                writer = self._write_vtk
-            case _:
-                raise ValueError('Unsupported file extension. Supported extensions are .csv, .npz, and .vtk.')
-        
-        # Write to file.
-        writer(filename, attributes)
-
-    def _write_csv(self, filename: str, attributes: List[Tuple[NDArray,List[str]]]) -> None:
-        """
-        Write pathlines to CSV file. It is assumed that all pathlines contain the same attributes.
-
-        :param filename: The name of the file to write to, including path and extension.
-        :type filename: str
-        :param attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
-        :type attributes: List[Tuple[NDArray,List[str]]]
-        """
-        
-        # Store to check if all pathlines contain same attributes.
-        attribute_names_ref = attributes[0][1]
-
-        # Write to file.
-        with open(filename, 'w') as f:
-            # Write header.
-            f.write('t')
-            for attribute_name in attribute_names_ref:
-                f.write(',' + attribute_name)
-            f.write('\n')
-
-            # Write data.
-            for attribute in attributes:
-                if attribute[1] != attribute_names_ref:
-                    raise ValueError('Not all pathlines contain the same attributes. Cannot write to CSV file.')
-                
-                vals = attribute[0]
-                for i in range(vals.shape[0]):
-                    f.write(str(vals[i,0]))
-                    for j in range(1,vals.shape[1]):
-                        f.write(',' + str(vals[i,j]))
-                    f.write('\n')
-    
-    def _write_npz(self, filename: str, attributes: List[Tuple[NDArray,List[str]]]) -> None:
-        """
-        Write pathlines to npz file. It is not assumed that all pathlines contain the same attributes. The attribute names and values on each pathline are stored as separate arrays in the file, pattern: arr_0 = attribute_values_pl1, arr_1 = attribute_names_pl1, arr_2 = attribute_values_pl2, arr_3 = attribute_names_pl2, ....
-
-        :param filename: The name of the file to write to.
-        :type filename: str
-        :param attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
-        :type attributes: List[Tuple[NDArray,List[str]]]
-        """
-
-        # Create interleaved list of attribute values and names.
-        attribute_value_name_list = [val for pair in attributes for val in pair]
-
-        # Write to file.
-        np.savez(filename, *attribute_value_name_list)
-
-    def _write_vtk(self, filename: str, pls_attributes: List[Tuple[NDArray,List[str]]]) -> None:
-        """
-        Write pathlines to VTK file. All pathlines are written to the same VTK file. They are identified by the attribute 'PathlineID', which is stored as a point data array. 
-
-        :param filename: The name of the file to write to.
-        :type filename: str
-        :param pl_attributes: A list of tuples, each containing the array of interpolated values and a list of attribute names of a pathline. The first column of the array contains the time points used.
-        :type pl_attributes: List[Tuple[NDArray,List[str]]]
-        """
-
-        # Create a cell array to store the lines in and add the lines to it
-        cells = vtkCellArray()
-
-        # Create a vtkPoints object and store the points in it
-        points = vtkPoints()
-
-        # Create a polydata to store everything
-        polyData = vtkPolyData()
-
-        idx = 0
-
-        for pl_attribute in pls_attributes:
-
-            # Get pathline attributes.
-            x = pl_attribute[0][:,1:4]
-            
-            # Create points.
-            for point in x:
-                points.InsertNextPoint(point)
-            
-            # Create pathline.
-            n = len(x)
-            polyLine = vtkPolyLine()
-            polyLine.GetPointIds().SetNumberOfIds(n)
-
-            for (i, j) in enumerate(np.arange(idx, idx+n)):
-                polyLine.GetPointIds().SetId(i, j)
-            
-            cells.InsertNextCell(polyLine)
-            idx = idx+n
-        
-        # Add everything to the dataset
-        polyData.SetPoints(points)
-        polyData.SetLines(cells)
-
-        # Add pathline ID as point data array.
-        pathline_id_array = vtkIntArray()
-        pathline_id_array.SetNumberOfComponents(0)
-        pathline_id_array.SetName('PathlineID')
-        for i in range(len(pls_attributes)):
-            pathline_id_array.InsertNextValue(i)
-        polyData.GetCellData().AddArray(pathline_id_array)
-
-        # Add attributes as point data arrays.
-        attribute_names = pls_attributes[0][1] # assume all pathlines have same attributes
-      
-        # Aggregate attribute values into array by component.
-        attribute_values = pls_attributes[0][0]
-        for pl_attributes in pls_attributes[1:]:
-            if pl_attributes[1] != attribute_names:
-                raise ValueError('Not all pathlines contain the same attributes. Cannot write to VTK file.')
-            attribute_values = np.append(attribute_values, pl_attributes[0], axis=0)
-        
-        # Add attribute values to polydata.
-        for (i, attribute_name) in enumerate(attribute_names):
-            attribute_array = numpy_to_vtk(attribute_values[:,i])
-            attribute_array.SetNumberOfComponents(0)
-            attribute_array.SetName(attribute_name)
-            polyData.GetPointData().AddArray(attribute_array)
-
-        # Write to file
-        writer = vtkPolyDataWriter()
-        writer.SetInputData(polyData)
-        writer.SetFileName(filename)
-        writer.Write()

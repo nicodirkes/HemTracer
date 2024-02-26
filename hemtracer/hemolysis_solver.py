@@ -1,22 +1,22 @@
 from __future__ import annotations
 from hemtracer.rbc_model import RBCModel
 from hemtracer.hemolysis_model import PowerLawModel
-from hemtracer.pathlines import PathlineTracker
+from hemtracer.pathlines import PathlineCollection
 from typing import List, Dict
 from numpy.typing import NDArray
 import numpy as np
 
 class HemolysisSolver:
     """
-    Class for computing hemolysis along pathlines. Takes an existing pathline tracker and handles the various pathlines contained within, interfacing to the hemolysis models.
+    Class for computing hemolysis along pathlines. Takes an existing pathline collection and handles the various pathlines contained within, interfacing to the hemolysis models.
     """
 
-    _pathline_tracker: PathlineTracker  
+    _pathlines: PathlineCollection
     """
-    Pathline tracker object.
+    Pathlines.
     """
 
-    _v_name: str
+    _v_name: str | None = None
     """
     Name of velocity attribute on pathlines.
     """
@@ -36,25 +36,25 @@ class HemolysisSolver:
     Name of orthogonal distance to center of rotation attribute on pathlines.
     """
 
-    def __init__(self, pathline_tracker: PathlineTracker) -> None:
+    def __init__(self, pathlines: PathlineCollection) -> None:
         """
-        Associate pathline tracker with hemolysis solver and get names of relevant quantities.
+        Associate pathlines with hemolysis solver and get names of relevant quantities.
 
-        :param pathline_tracker: Pathline tracker object.
-        :type pathline_tracker: PathlineTracker
+        :param pathlines: Pathlines to analyze.
+        :type pathlines: PathlineCollection
         """
 
-        self._pathline_tracker = pathline_tracker
-        self._v_name = self._pathline_tracker.get_name_velocity() # Velocity.
+        self._pathlines = pathlines
+        self._v_name = self._pathlines.get_name_velocity() # Velocity.
 
-        dv_name = self._pathline_tracker.get_name_velocity_gradient() # Velocity gradient.
+        dv_name = self._pathlines.get_name_velocity_gradient() # Velocity gradient.
         if dv_name is None:
             raise AttributeError('No velocity gradient data available on pathlines.')
         else:
             self._dv_name = dv_name
 
-        self._omega_name = self._pathline_tracker.get_name_omega_frame() # Angular velocity of frame of reference.
-        self._r_name = self._pathline_tracker.get_name_distance_center() # Orthogonal distance to center of rotation.
+        self._omega_name = self._pathlines.get_name_omega_frame() # Angular velocity of frame of reference.
+        self._r_name = self._pathlines.get_name_distance_center() # Orthogonal distance to center of rotation.
 
 
     def compute_representativeShear(self, model: RBCModel) -> None:
@@ -66,7 +66,7 @@ class HemolysisSolver:
         """
 
         i=0
-        pathlines = self._pathline_tracker.get_pathlines()
+        pathlines = self._pathlines.get_pathlines()
         n_total = len(pathlines)
         G_rep_name = model.get_attribute_name()
 
@@ -109,8 +109,8 @@ class HemolysisSolver:
         :type powerlaw_model: PowerLawModel
         """
 
-        cell_model_solutions = self._pathline_tracker.get_attribute(powerlaw_model.get_scalar_shear_name())
-        pathlines = self._pathline_tracker.get_pathlines()
+        cell_model_solutions = self._pathlines.get_attribute(powerlaw_model.get_scalar_shear_name())
+        pathlines = self._pathlines.get_pathlines()
 
         n_total = len(cell_model_solutions)
         i=0
@@ -140,7 +140,7 @@ class HemolysisSolver:
         :rtype: List[Dict[str, NDArray]]
         """
 
-        return self._pathline_tracker.get_attribute(model.get_attribute_name())
+        return self._pathlines.get_attribute(model.get_attribute_name())
     
     def average_hemolysis(self, model: PowerLawModel) -> float:
         """
@@ -152,7 +152,7 @@ class HemolysisSolver:
         :rtype: float
         """
 
-        IHs = self._pathline_tracker.get_attribute(model.get_attribute_name())
-        IHs = [IH['y'][-1] for IH in IHs]
+        IHs = self._pathlines.get_attribute(model.get_attribute_name())
+        IHs_end = [IH['y'][-1] for IH in IHs]
 
-        return np.mean(IHs)
+        return float(np.mean(IHs_end))

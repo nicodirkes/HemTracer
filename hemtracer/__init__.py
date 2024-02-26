@@ -1,5 +1,5 @@
 from hemtracer.eulerian_flow_field import EulerianFlowField
-from hemtracer.pathlines import PathlineTracker
+from hemtracer.pathlines import PathlineTracker, PathlineReader
 from hemtracer.hemolysis_solver import HemolysisSolver
 
 from hemtracer.hemolysis_model import hemolysis_model
