@@ -675,6 +675,9 @@ class PathlineReader (PathlineCollection):
         # If indices are specified, only read those pathlines.
         if idx is not None:
             pathline_ids = pathline_ids[idx]
+        
+        # Find additional attributes, if available.
+        additional_attributes = [key for key in pl_data.columns if key not in [id_name, t_name] + pos_names + vel_names + vel_grad_names + omega_names + [distance_center_name]]
 
         # Read data.
         for pathline_id in pathline_ids:
@@ -703,6 +706,10 @@ class PathlineReader (PathlineCollection):
             if self._distance_center_name:
                 d = pl_data_id[distance_center_name] if distance_center_name else zeros
                 pl.add_attribute(t, d, self._distance_center_name)
+            
+            for attribute in additional_attributes:
+                a = pl_data_id[attribute]
+                pl.add_attribute(t, a, attribute)
 
             # Add pathline to collection.
             self._pathlines.append(pl)
