@@ -200,9 +200,10 @@ class PowerLawModel:
         dt = np.diff(t)
         C_tau_beta = self._C * tau**self._beta
 
-        for i in range(1, len(t)):
+        for i in range(1, len(t)-1):
             t_eff = (IH[i-1] / C_tau_beta[i-1])**(1/self._alpha)
             IH[i] = C_tau_beta[i] * (t_eff + dt[i-1])**self._alpha
+        IH[-1] = IH[-2]
 
         return IH
     
