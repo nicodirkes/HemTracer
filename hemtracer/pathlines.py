@@ -434,23 +434,21 @@ class PathlineCollection:
         with open(filename, 'w') as f:
             
             # Write header.
-            f.write('"PathlineID"')
-            f.write('"t"') # time column
+            f.write('"PathlineID"') # pathline ID and time columns
             for attribute_name in attribute_names_ref:
                 f.write(',"' + attribute_name + '"')
             f.write('\n')
 
             # Write data.
-            for pathline in pathlines:
+            for (i,pathline) in enumerate(pathlines):
                 if pathline[1] != attribute_names_ref:
                     raise ValueError('Not all pathlines contain the same attributes. Cannot write to CSV file.')
                 
                 vals = pathline[0]
-                for i in range(vals.shape[0]):
-                    f.write(str(i))
-                    f.write(str(vals[i,0]))
-                    for j in range(1,vals.shape[1]):
-                        f.write(',' + str(vals[i,j]))
+                for vals_t in vals:
+                    f.write(str(i+1))
+                    for val in vals_t:
+                        f.write(',' + str(val))
                     f.write('\n')
     
     def _write_npz(self, filename: str, pathlines: List[Tuple[NDArray,List[str]]]) -> None:
