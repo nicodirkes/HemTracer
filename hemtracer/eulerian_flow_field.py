@@ -14,51 +14,6 @@ class EulerianFlowField:
     A class that represents a steady flow field in Eulerian coordinates with various field data. Unsteady flow fields are currently only supported in the form of MRF data. The mesh has to be unstructured and non-moving and the flow field has to be defined as node-centered velocity field (point data in VTK). The flow field is represented by a VTK file. It has to contain a velocity field. Additional field data, e.g., an Eulerian hemolysis solution, can be imported from other VTK files using the import_field_data method. The class provides functionality to interpolate field data to pathlines.
     """
 
-    _vtk_flow_field_name: str
-    """
-    Name of the VTK file containing the flow field.
-    """
-
-    _vtk_flow_field: vtkUnstructuredGrid
-    """
-    VTK flow field object.
-    """
-
-    _velocity_name: str = "velocity"
-    """
-    Name of the velocity field in the VTK file. Defaults to "velocity".
-    Assume that the velocity field is called "velocity" in the VTK file.
-    """
-
-    _velocity_gradient_name: str | None = None  
-    """
-    Name of the velocity gradient field in the VTK file.
-    Assume that no gradient has been computed yet.
-    """
-
-    _mrf_velocity_name: str | None = None  
-    """
-    Name of the MRF velocity field in the VTK file.
-    Assume that no MRF velocity has been computed yet.
-    """
-
-    _mrf_omega_name: str | None = None  
-    """
-    Name of the angular velocity of the rotating frame of reference in the VTK file.
-    Computed as part of MRF transformation.
-    """
-
-    _mrf_r_name: str | None = None  
-    """
-    Name of the orthogonal distance from the rotation axis in the VTK file.
-    Computed as part of MRF transformation.
-    """
-
-    _interpolator: vtkProbeFilter | None = None  
-    """
-    Field interpolator (may be used to extract cell data along pathline).
-    """
-
     def __init__(self, vtk_filename: str) -> None:
         """
         Initialize the EulerianField object with a VTK flow field name.
@@ -67,8 +22,16 @@ class EulerianFlowField:
         :type vtk_filename: str
         """
 
+        # Initialize attributes.
+        self._vtk_flow_field_name = vtk_filename # Name of the VTK file containing the flow field.
+        self._velocity_name = "velocity" # Name of the velocity field in the VTK file.
+        self._velocity_gradient_name = None # Name of the velocity gradient field in the VTK file.
+        self._mrf_velocity_name = None # Name of the MRF velocity field in the VTK file.
+        self._mrf_omega_name = None # Name of the angular velocity of the rotating frame of reference in the VTK file.
+        self._mrf_r_name = None # Name of the orthogonal distance from the rotation axis in the VTK file.
+        self._interpolator = None # Field interpolator (may be used to extract cell data along pathline).
+
         # Read VTK file.
-        self._vtk_flow_field_name = vtk_filename
         _vtk_flow_field_reader = vtkUnstructuredGridReader()
         _vtk_flow_field_reader.SetFileName(self._vtk_flow_field_name)
         _vtk_flow_field_reader.Update()

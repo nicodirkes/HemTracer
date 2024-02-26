@@ -11,31 +11,6 @@ class HemolysisSolver:
     Class for computing hemolysis along pathlines. Takes an existing pathline collection and handles the various pathlines contained within, interfacing to the hemolysis models.
     """
 
-    _pathlines: PathlineCollection
-    """
-    Pathlines.
-    """
-
-    _v_name: str | None = None
-    """
-    Name of velocity attribute on pathlines.
-    """
-
-    _dv_name: str
-    """
-    Name of velocity gradient attribute on pathlines.
-    """
-
-    _omega_name: str | None = None  
-    """
-    Name of angular velocity attribute on pathlines.
-    """
-
-    _r_name: str | None = None  
-    """
-    Name of orthogonal distance to center of rotation attribute on pathlines.
-    """
-
     def __init__(self, pathlines: PathlineCollection) -> None:
         """
         Associate pathlines with hemolysis solver and get names of relevant quantities.
@@ -44,7 +19,8 @@ class HemolysisSolver:
         :type pathlines: PathlineCollection
         """
 
-        self._pathlines = pathlines
+        # Initialize attributes.
+        self._pathlines = pathlines # Pathlines.
         self._v_name = self._pathlines.get_name_velocity() # Velocity.
 
         dv_name = self._pathlines.get_name_velocity_gradient() # Velocity gradient.

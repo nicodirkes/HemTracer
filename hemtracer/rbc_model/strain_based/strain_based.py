@@ -30,47 +30,16 @@ class StrainBasedModel(RBCModel):
     """Represents a strain-based blood damage model. These models employ a differential equation to explicitly resolve cell deformation in response to the acting flow forces. In the current implementation, this is constructed in particular for the Arora model (Arora et al. 2004) and all models derived from it, i.e., the simplified Eulerian model :cite:t:`pauli_transient_2013`, the full Eulerian morphology model (Dirkes et al. 2023) and the tank-treading model (Dirkes et al. 2023). In theory, however, also other strain-based models could be implemented as sub-classes. Since an ODE solver is required, these models offer additional configuration options for the solver and the initial condition.
     """
 
-    _initial_condition: Callable[[], NDArray]
-    """
-    Function that returns initial condition for solution variable, i.e., shape of cells at the start of pathline integration.
-    """
-
-    _method: str
-    """
-    Method for ODE solver.
-    """
-
-    _atol: float
-    """
-    Absolute tolerance for ODE solver.
-    """
-
-    _rtol: float
-    """
-    Relative tolerance for ODE solver.
-    """
-
-    _first_step: float
-    """
-    Initial step size for ODE solver.
-    """
-
-    _max_step: float
-    """
-    Maximum step size for ODE solver.
-    """
-
-    _coeffs: MorphologyModelCoefficients = MorphologyModelCoefficients.ARORA
-    """
-    Coefficients for morphology model.
-    """
-
     def __init__(self) -> None:
         """
         Arora coefficients (Arora et al. 2004) are used by default.
         """
 
         super().__init__()
+
+        # initialize attributes
+        self._coeffs = MorphologyModelCoefficients.ARORA # Coefficients for morphology model
+
         self.set_initial_condition()
         self.configure_ODE_solver()
     
@@ -721,16 +690,6 @@ class TankTreading(MorphologyEigFormulation):
     Represents the tank-treading cell deformation model (see :ref:`tanktreading-model`), 
     """
 
-    _maxIt: int
-    """
-    Maximum number of iterations for steady state orientation.
-    """
-
-    _tol: float
-    """
-    Tolerance for convergence of steady state orientation.
-    """
-
     def __init__(self) -> None:
         """
         Arora coefficients (Arora et al. 2004) are used by default.
@@ -981,18 +940,6 @@ class TankTreading(MorphologyEigFormulation):
 class TankTreadingRotationCorrection(TankTreading):
     """
     Represents the tank-treading model (Dirkes et al. 2023) with a correction term for cell rotation along the pathline. This model is still experimental and not yet published.
-    """
-
-    _x: Callable[[float], Vector3]  
-    """
-    Relevant position measure as a function of pathline time, e.g., absolute coordinates 
-    or distance from rotational center (required only for tank-treading with pathline correction).
-    """
-
-    _v: Callable[[float], Vector3]
-    """
-    Velocity as a function of pathline time 
-    (required only for tank-treading with pathline correction).
     """
 
     def get_name(self) -> str:

@@ -10,33 +10,6 @@ class RBCModel:
     """Abstract base class for any model that computes a scalar shear rate along a pathline. These models assume a certain red blood cell (RBC) behavior, hence the name RBC Model. They can be categorized into two groups: stress-based and strain-based models. Stress-based models assume direct deformation of the cell in response to stress, reducing the instantaneous three-dimensional local fluid strain to a representative scalar shear rate. Strain-based models take into account the characteristic membrane relaxation time, employing a differential equation to explicitly resolve cell deformation in response to the acting flow forces. They then compute a scalar shear rate (so-called effective shear) from cell deformation.
     """
 
-    _t0: float  
-    """
-    Start time.
-    """
-
-    _tend: float
-    """
-    End time.
-    """
-
-    _dv: Callable[[float], Vector9]
-    """
-    Velocity gradient tensor (in vector form) as a function of pathline time 
-    (required for all currently implemented models).
-    """
-
-    _omega: Callable[[float], Vector3]
-    """
-    MRF angular velocity vector as a function of pathline time 
-    (required for all currently implemented models except stress-based bludszuweit).
-    """
-
-    _init: Dict[str, float] | None
-    """
-    Dict that holds initial values for various attributes on the pathline. May be used for initial conditions.
-    """
-
     def set_time_dependent_quantitites(self, t0: float, tend: float, 
                                        dv: Callable[[float],Vector9] | None = None, 
                                        omega: Callable[[float],Vector3] | None = None, 
@@ -81,11 +54,11 @@ class RBCModel:
             omega = lambda t: np.zeros(3)
 
         """Assign quantities."""
-        self._t0 = t0
-        self._tend = tend
-        self._dv = dv
-        self._omega = omega
-        self._init = init
+        self._t0 = t0 # Start time.
+        self._tend = tend # End time.
+        self._dv = dv # Velocity gradient tensor.
+        self._omega = omega # MRF angular velocity vector.
+        self._init = init # Initial values for attributes on pathline.
 
     def _compute_strain_tensor(self, t: float) -> Tensor3:
         """

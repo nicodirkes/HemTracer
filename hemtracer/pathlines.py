@@ -18,26 +18,6 @@ class PathlineAttribute:
     """Class for storing a quantity of interest along a pathline. The data is stored as a function of the integration time. All class attributes are meant to be publicly accessible.
     """
 
-    t: NDArray
-    """
-    The integration times along the pathline at which the values are stored.
-    """
-
-    val: NDArray
-    """
-    The values of the quantity of interest along the pathline.
-    """
-
-    name: str
-    """
-    The name of the quantity of interest.
-    """
-
-    interpolator: interp1d
-    """
-    A function that interpolates the values along the pathline.
-    """
-
     def __init__(self, t: ArrayLike, val: ArrayLike, name: str, interpolation_scheme: str='linear') -> None:
         """
         :param t: The integration times along the pathline.
@@ -51,9 +31,24 @@ class PathlineAttribute:
         """
 
         self.t = np.asarray(t)
+        """
+        The integration times along the pathline at which the values are stored.
+        """
+
         self.val = np.asarray(val)
+        """
+        The values of the quantity of interest along the pathline.
+        """
+
         self.name = name
+        """
+        The name of the quantity of interest.
+        """
+
         self.interpolator = interp1d(self.t, self.val, axis=0, kind=interpolation_scheme, assume_sorted=True)
+        """
+        A function that interpolates the values along the pathline.
+        """
 
     def get_number_of_components(self) -> int:
         """
@@ -73,26 +68,6 @@ class Pathline:
     Class representing a single pathline as a collection of PathlineAttribute objects. Every pathline has an attribute 'Position', which is stored by default as definition of the pathline. Additional attributes can be added using the add_attribute function.
     """
 
-    _attributes: List[PathlineAttribute]
-    """
-    A list of PathlineAttribute objects.
-    """
-
-    _t0: float
-    """
-    The initial integration time of the pathline.
-    """
-
-    _tend: float
-    """
-    The final integration time of the pathline.
-    """
-
-    _reason_for_termination: str
-    """
-    The reason for termination of the pathline integration. Can be 'out of domain', 'not initialized', 'unexpected value', 'out of length', 'out of steps', 'stagnation', 'misc'.
-    """
-
     def __init__(self, t: List[float], x: List[Vector3], reason_for_termination: str = 'misc') -> None:
         """
         Constructing an object creates its 'Position' attribute and stores it in attributes list.
@@ -108,10 +83,25 @@ class Pathline:
         if len(t) == 1:
             raise ValueError("Pathline must have at least two points.")
         
-        self._t0 = t[0]
+        self._t0 = t[0] 
+        """
+            The initial integration time of the pathline.
+        """
+
         self._tend = t[-1]
+        """
+            The final integration time of the pathline.
+        """
+
         self._attributes = [ PathlineAttribute(t, x, position_name) ]
+        """
+        A list of PathlineAttribute objects.
+        """
+
         self._reason_for_termination = reason_for_termination
+        """
+        The reason for termination of the pathline integration. Can be 'out of domain', 'not initialized', 'unexpected value', 'out of length', 'out of steps', 'stagnation', 'misc'.
+        """
 
     def get_position_attribute(self) -> PathlineAttribute:
         """
@@ -317,30 +307,12 @@ class PathlineCollection:
     Class for storing a collection of pathlines. 
     """
 
-    _pathlines: List[Pathline] = []
-    """
-    A list of Pathline objects.
-    """
-
-    _velocity_name: str | None = None
-    """
-    The name of the velocity field.
-    """
-
-    _velocity_gradient_name: str | None = None
-    """
-    The name of the velocity gradient field.
-    """
-
-    _omega_frame_name: str | None = None
-    """
-    The name of the angular velocity vector of the frame of reference.
-    """
-
-    _distance_center_name: str | None = None
-    """
-    The name of the field for the orthogonal distance to the center of rotation.
-    """
+    def __init__(self):
+        self._pathlines = [] # A list of Pathline objects.
+        self._velocity_name = None # The name of the velocity field.
+        self._velocity_gradient_name = None # The name of the velocity gradient field.
+        self._omega_frame_name = None # The name of the angular velocity vector of the frame of reference.
+        self._distance_center_name = None # The name of the field for the orthogonal distance to the center of rotation.
 
     def get_pathlines(self) -> List[Pathline]:
         """
@@ -635,6 +607,8 @@ class PathlineReader (PathlineCollection):
         :type idx: List[int] | None
         """
 
+        super().__init__()
+
         print('Reading pathlines from file ' + filename + '...')
 
         # set attribute names
@@ -645,10 +619,14 @@ class PathlineReader (PathlineCollection):
         omega_names = [omegaX_name, omegaY_name, omegaZ_name]
         if any(omega_names):
             self._omega_frame_name = 'OmegaFrame'
+        else:
+            self._omega_frame_name = None
         
         vel_names = [velX_name, velY_name, velZ_name]
         if any(vel_names):
             self._velocity_name = 'Velocity'
+        else:
+            self._velocity_name = None
 
         vel_grad_names = [dvX_dx_name, dvX_dy_name, dvX_dz_name, dvY_dx_name, dvY_dy_name, dvY_dz_name, dvZ_dx_name, dvZ_dy_name, dvZ_dz_name]
         if any(vel_grad_names):
@@ -737,11 +715,6 @@ class PathlineTracker (PathlineCollection):
     Class for generating pathlines from a given flow field. Uses VTK's vtkStreamTracer to compute pathlines. Stores pathlines as :class:`Pathline` objects. All point-centered data available in the Eulerian field is interpolated to the pathlines. Cell-centered data is not interpolated. Data can be interpolated to the pathlines afterwards using the :func:`interpolate_to_pathlines` function.
     """
 
-    _flow_field: EulerianFlowField
-    """
-    The EulerianFlowField object in which to track pathlines.
-    """
-
     def __init__(self, flow_field: EulerianFlowField) -> None:
         """
         Associate Eulerian flow field data and find appropriate velocity field.
@@ -749,8 +722,10 @@ class PathlineTracker (PathlineCollection):
         :param flow_field: The flow field in which to track pathlines.
         :type flow_field: EulerianFlowField
         """
+        
+        super().__init__()
 
-        self._flow_field = flow_field
+        self._flow_field = flow_field # The flow field in which to track pathlines.
 
         # Find name of relevant velocity field.
         self._velocity_name = self._flow_field.get_name_advection_velocity()

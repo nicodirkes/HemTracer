@@ -38,51 +38,6 @@ class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
     """
 
-    _scalar_shear_name: str
-    """
-    Name of scalar shear rate attribute.
-    """
-
-    _hemolysis_correlation: IHCorrelation
-    """
-    Power law coefficients to use.
-    """
-
-    _corr_name: str
-    """
-    Name of correlation used.
-    """
-
-    _mu: float
-    """
-    Dynamic viscosity of blood.
-    """
-
-    _C: float
-    r"""
-    Coefficient C for hemolysis correlation :math:`HI = C t^\alpha \sigma^\beta`. This corresponds to the definition in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. The internal values of this class are thus different from the definitions in :class:`HemolysisCorrelation`, i.e., :math:`C = A_\mathrm{Hb}, \, \alpha = \beta_\mathrm{Hb}, \, \beta = \alpha_\mathrm{Hb}`. This is to allow for direct comparison of the numerical schemes with the formulations in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`.
-    """
-
-    _alpha: float
-    """
-    Coefficient alpha in hemolysis correlation.
-    """
-
-    _beta: float
-    """
-    Coefficient beta in hemolysis correlation.
-    """
-
-    _integration_scheme_name: str
-    """
-    Name of scheme used to numerically integrate hemolysis correlation.
-    """
-
-    _compute_IH: Callable[[NDArray, NDArray], NDArray]
-    """
-    Function that computes hemolysis index from time and scalar shear rate using the desired integration scheme.
-    """
-
     def __init__(self, scalar_shear: RBCModel | str, hemolysis_correlation: IHCorrelation = IHCorrelation.GIERSIEPEN, mu: float = 3.5e-3, integration_scheme: str = 'basic') -> None:
         """
         Initialization defines all parameters to use. They cannot be changed afterwards.
@@ -105,7 +60,10 @@ class PowerLawModel:
         self._corr_name = hemolysis_correlation.name
         self._integration_scheme_name = integration_scheme
 
-        """Obtain coefficients for definitions in accordance with Taskin et al."""
+        r"""
+        Obtain coefficients for definitions in accordance with Taskin et al.
+        Coefficient C for hemolysis correlation :math:`HI = C t^\alpha \sigma^\beta`. This corresponds to the definition in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. The internal values of this class are thus different from the definitions in :class:`HemolysisCorrelation`, i.e., :math:`C = A_\mathrm{Hb}, \, \alpha = \beta_\mathrm{Hb}, \, \beta = \alpha_\mathrm{Hb}`. This is to allow for direct comparison of the numerical schemes with the formulations in Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`.
+        """
         self._C = hemolysis_correlation.A_Hb
         self._alpha = hemolysis_correlation.beta_Hb
         self._beta = hemolysis_correlation.alpha_Hb
