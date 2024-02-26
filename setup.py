@@ -19,6 +19,6 @@ setup(
     url='nicodirkes.github.io/HemTracer/',
     license=license,
     packages=find_packages(exclude=('tests', 'docs')),
-    install_requires=['numpy', 'scipy', 'vtk'],
+    install_requires=['numpy', 'scipy', 'vtk', 'pandas'],
     python_requires='>=3.12',
 )
