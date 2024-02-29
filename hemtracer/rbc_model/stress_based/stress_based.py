@@ -87,6 +87,42 @@ class Bludszuweit(StressBasedModel):
             -   (s_xx*s_yy + s_xx*s_zz + s_yy*s_zz)
             + 3*(t_xy**2   + t_xz**2   + t_yz**2  ))
         return G
+    
+class FaghihSharp(StressBasedModel):
+    r"""
+    Represents the stress-based model by Faghih and Sharp :ref:`faghih_deformation_2020` that weighs extensional and shear stresses differently.
+    """
+
+    def get_name(self) -> str:
+        """
+        Get name of blood damage model.
+
+        :return: Name of the blood damage model.
+        :rtype: str
+        """
+
+        return 'stress-faghih-sharp'
+    
+    def _compute_representative_shear(self, E: Tensor3) -> float:
+        """
+        Reduce 3D strain tensor to representative scalar shear rate using the law proposed by Faghih and Sharp.
+        """
+
+        C_n = 33.79/np.sqrt(3)
+
+        t_xy = E[0,1]
+        t_xz = E[0,2]
+        t_yz = E[1,2]
+        s_xx = E[0,0]
+        s_yy = E[1,1]
+        s_zz = E[2,2]
+
+        G = np.sqrt( C_n**2 * (
+                       s_xx**2   + s_yy**2   + s_zz**2
+                    - (s_xx*s_yy + s_xx*s_zz + s_yy*s_zz))
+                    + (t_xy**2   + t_xz**2   + t_yz**2) )
+        return G
+
 
 class Frobenius(StressBasedModel):
     r"""
