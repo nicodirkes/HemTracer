@@ -90,7 +90,7 @@ class Bludszuweit(StressBasedModel):
     
 class FaghihSharp(StressBasedModel):
     r"""
-    Represents the stress-based model by Faghih and Sharp :ref:`faghih_deformation_2020` that weighs extensional and shear stresses differently.
+    Represents the stress-based model by Faghih and Sharp :ref:`faghih-sharp-model` that weighs extensional and shear stresses differently.
     """
 
     def get_name(self) -> str:

@@ -95,6 +95,18 @@ This model was proposed by Bludszuweit :cite:p:`bludszuweitModelGeneralMechanica
 
 This is implemented as :class:`hemtracer.rbc_model.stress_based.Bludszuweit`.
 
+.. _faghih-sharp-model:
+Faghih and Sharp model
+^^^^^^^^^^^^^^^^^^^^^^
+
+This model was proposed by Faghih and Sharp :cite:p:`faghih_deformation_2020` that weighs extensional and shear stresses differently:
+
+.. math:: G_s = \sqrt{C_n^2 \left[ E_{xx}^2 + E_{yy}^2 + E_{zz}^2 
+                                    - (E_{xx} E_{yy} + E_{xx} E_{zz} + E_{yy} E_{zz}) \right]
+                    + E_{xy}^2 + E_{xz}^2 + E_{yz}^2}
+
+With :math:`\sqrt{3} C_n = 33.79`. This is implemented as :class:`hemtracer.rbc_model.stress_based.FaghihSharp`. 
+
 .. _frobenius-model:
 
 Frobenius norm
