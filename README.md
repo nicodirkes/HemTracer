@@ -10,7 +10,7 @@ The recommended way to install is to create a virtual environment from the home 
 ```shell
 python3.12 -m venv env
 source venv/bin/activate
-python3.12 -m pip install .
+python3 -m pip install .
 ```
 This creates a folder `env` that will contain all required packages, ensuring consistent conditions. You can exit the virtual environment by running
 ```shell
@@ -24,7 +24,7 @@ source /path/to/hemtracer/venv/bin/activate
 ```
 Then your Python will use the correct environment and you can run
 ```shell
-python your_hemo_analysis_script.py
+python3 your_hemo_analysis_script.py
 ```
 
 ## Code
