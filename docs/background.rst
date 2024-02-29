@@ -96,6 +96,7 @@ This model was proposed by Bludszuweit :cite:p:`bludszuweitModelGeneralMechanica
 This is implemented as :class:`hemtracer.rbc_model.stress_based.Bludszuweit`.
 
 .. _faghih-sharp-model:
+
 Faghih and Sharp model
 ^^^^^^^^^^^^^^^^^^^^^^
 

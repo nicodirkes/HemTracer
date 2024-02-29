@@ -40,6 +40,10 @@ RBC models
    .. autoclass:: hemtracer.rbc_model.stress_based.Bludszuweit
       :members:
       :inherited-members:
+
+   .. autoclass:: hemtracer.rbc_model.stress_based.FaghihSharp
+      :members:
+      :inherited-members:
    
    .. autoclass:: hemtracer.rbc_model.stress_based.Frobenius
       :members:
