@@ -97,7 +97,7 @@ class RBCModel:
         :rtype: float
         """
 
-        G = np.sqrt(2*np.abs(self._compute_second_invariant(E)))
+        G = 2*np.sqrt(np.abs(self._compute_second_invariant(E)))
 
         return G
 

@@ -82,7 +82,7 @@ class Bludszuweit(StressBasedModel):
         s_yy = E[1,1]
         s_zz = E[2,2]
 
-        G = 1/np.sqrt(3) * np.sqrt(
+        G = 2/np.sqrt(3) * np.sqrt(
                 (s_xx**2   + s_yy**2   + s_zz**2  ) 
             -   (s_xx*s_yy + s_xx*s_zz + s_yy*s_zz)
             + 3*(t_xy**2   + t_xz**2   + t_yz**2  ))
@@ -117,7 +117,7 @@ class FaghihSharp(StressBasedModel):
         s_yy = E[1,1]
         s_zz = E[2,2]
 
-        G = np.sqrt( C_n**2 * (
+        G = 2*np.sqrt( C_n**2 * (
                        s_xx**2   + s_yy**2   + s_zz**2
                     - (s_xx*s_yy + s_xx*s_zz + s_yy*s_zz))
                     + (t_xy**2   + t_xz**2   + t_yz**2) )
@@ -149,7 +149,7 @@ class Frobenius(StressBasedModel):
         :rtype: float
         """
 
-        G = np.linalg.norm(E, ord='fro')
+        G = np.sqrt(2)*np.linalg.norm(E, ord='fro')
         return float(G)
 
 class SecondInvariant(StressBasedModel):

@@ -88,7 +88,7 @@ Bludszuweit model
 
 This model was proposed by Bludszuweit :cite:p:`bludszuweitModelGeneralMechanical1995a`. It computes a representative scalar from instantaneous fluid strain, similar to the von Mises stress:
 
-.. math:: G_s = \frac{1}{\sqrt{3}} \sqrt{
+.. math:: G_s = \frac{2}{\sqrt{3}} \sqrt{
     \left(E_{xx}^2 + E_{yy}^2 + E_{zz}^2\right)
     - \left(E_{xx} E_{yy} + E_{xx} E_{zz} + E_{yy} E_{zz}\right)
     + 3 \left(E_{xy}^2 + E_{xz}^2 + E_{yz}^2\right)}
@@ -100,9 +100,9 @@ This is implemented as :class:`hemtracer.rbc_model.stress_based.Bludszuweit`.
 Faghih and Sharp model
 ^^^^^^^^^^^^^^^^^^^^^^
 
-This model was proposed by Faghih and Sharp :cite:p:`faghih_deformation_2020` that weighs extensional and shear stresses differently:
+This model was proposed by Faghih and Sharp :cite:p:`faghih_deformation_2020`. It weighs extensional and shear stresses differently:
 
-.. math:: G_s = \sqrt{C_n^2 \left[ E_{xx}^2 + E_{yy}^2 + E_{zz}^2 
+.. math:: G_s = 2 \sqrt{C_n^2 \left[ E_{xx}^2 + E_{yy}^2 + E_{zz}^2 
                                     - (E_{xx} E_{yy} + E_{xx} E_{zz} + E_{yy} E_{zz}) \right]
                     + E_{xy}^2 + E_{xz}^2 + E_{yz}^2}
 
@@ -115,7 +115,7 @@ Frobenius norm
 
 Computes a representative scalar from instantaneous fluid strain using the Frobenius norm:
 
-.. math:: G_s = \sqrt{\sum_{i,j} E_{ij}^2}
+.. math:: G_s = \sqrt{2 \sum_{i,j} E_{ij}^2}
 
 This is implemented as :class:`hemtracer.rbc_model.stress_based.Frobenius`.
 
@@ -126,7 +126,7 @@ Second strain invariant
 
 Computes a representative scalar from instantaneous fluid strain using the second strain invariant:
 
-.. math:: G_s = \sqrt{ \mathrm{tr}(\mathbf{E}^2 ) }
+.. math:: G_s = \sqrt{ 2 \mathrm{tr}(\mathbf{E}^2 ) }
 
 This is implemented as :class:`hemtracer.rbc_model.stress_based.SecondInvariant`.
 
