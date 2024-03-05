@@ -135,7 +135,7 @@ class PowerLawModel:
         tau = np.squeeze(self._mu * G[:-1])
         dt = np.diff(t)
         t_power = t[1:]**(self._alpha-1)
-        IH[1:] = np.cumsum(self._C * t_power * tau**self._beta * dt)
+        IH[1:] = self._C * self._alpha * np.cumsum(t_power * tau**self._beta * dt)
 
         return IH
 
