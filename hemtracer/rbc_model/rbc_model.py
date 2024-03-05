@@ -11,6 +11,7 @@ class RBCModel:
     """
 
     def set_time_dependent_quantitites(self, t0: float, tend: float, 
+                                       time_points: NDArray | None = None,
                                        dv: Callable[[float],Vector9] | None = None, 
                                        omega: Callable[[float],Vector3] | None = None, 
                                        x: Callable[[float], Vector3] | None = None,
@@ -24,6 +25,8 @@ class RBCModel:
         :type t0: float
         :param tend: End time.
         :type tend: float
+        :param time_points: Time points at which to sample velocity gradients. 
+        :type time_points: NDArray
         :param dv: Velocity gradient tensor (in vector form) as a function of pathline time.
         :type dv: Callable[[float],Vector9]
         :param omega: MRF angular velocity vector as a function of pathline time.
@@ -56,6 +59,7 @@ class RBCModel:
         """Assign quantities."""
         self._t0 = t0 # Start time.
         self._tend = tend # End time.
+        self._time_points = time_points # Time points at which to sample velocity gradients.
         self._dv = dv # Velocity gradient tensor.
         self._omega = omega # MRF angular velocity vector.
         self._init = init # Initial values for attributes on pathline.

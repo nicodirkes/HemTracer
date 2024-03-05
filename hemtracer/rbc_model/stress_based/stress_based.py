@@ -6,13 +6,15 @@ import numpy as np
 
 class StressBasedModel(RBCModel):
     r"""
-    Represents a stress-based blood damage model. These models reduce the instantaneous three-dimensional local fluid strain :math:`\mathbf{E}` to a representative scalar shear rate :math:`G_s`. They assume that RBCs deform instantly in response to changes in fluid stress. The local velocity gradient tensor is sampled at fixed time intervals (default: 0.001 s) and the representative scalar shear rate is computed from the strain tensor.
+    Represents a stress-based blood damage model. These models reduce the instantaneous three-dimensional local fluid strain :math:`\mathbf{E}` to a representative scalar shear rate :math:`G_s`. They assume that RBCs deform instantly in response to changes in fluid stress. The local velocity gradient tensor is taken from pathlines or sampled at fixed time intervals and the representative scalar shear rate is computed from the strain tensor.
     """
 
-    _sampling_rate: float = 0.001
-    """
-    Sampling rate for stress-based model.
-    """
+    def __init__(self) -> None:
+        """
+        Initialize stress-based model. By default, use same time points as pathline, i.e., do not sample.
+        """
+
+        self._sampling_rate = None
 
     def set_sampling_rate(self, sampling_rate: float) -> None:
         """
@@ -33,7 +35,13 @@ class StressBasedModel(RBCModel):
         :rtype: Tuple[NDArray, NDArray]
         """
 
-        t = np.arange(self._t0, self._tend, self._sampling_rate)
+        if self._sampling_rate is not None:
+            t = np.arange(self._t0, self._tend, self._sampling_rate)
+        else:
+            if self._time_points is None:
+                raise AttributeError('No time points defined.')
+            t = self._time_points
+
         G = np.asarray([self._compute_representative_shear(self._compute_strain_tensor(ti)) for ti in t])
 
         return (t, G)

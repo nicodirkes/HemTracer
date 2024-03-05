@@ -57,6 +57,9 @@ class HemolysisSolver:
             r = pathline.get_attribute_interpolator(self._r_name)
             v = pathline.get_attribute_interpolator(self._v_name)
 
+            # Use position attribute as reference for time points.
+            ti = pathline.get_position_attribute().t
+
             # create dict of initial attribute values
             init = {}
             for attr_name in pathline.get_attribute_names():
@@ -65,7 +68,7 @@ class HemolysisSolver:
                     init[attr_name] = np.squeeze(interp(t0))
 
             # Give pathline information to model.
-            model.set_time_dependent_quantitites(t0, tend, dv, om, r, v, init)
+            model.set_time_dependent_quantitites(t0, tend, ti, dv, om, r, v, init)
 
             # Solve model.
             (t, G_rep) = model.compute_representative_shear()

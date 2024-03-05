@@ -953,6 +953,7 @@ class TankTreadingRotationCorrection(TankTreading):
         return 'tank-treading-pathline'
     
     def set_time_dependent_quantitites(self, t0: float, tend: float, 
+                                       time_points: NDArray | None = None,
                                        dv: Callable[[float], Vector9] | None = None, 
                                        omega: Callable[[float], Vector3] | None = None, 
                                        x: Callable[[float], Vector3] | None = None, 
@@ -979,7 +980,7 @@ class TankTreadingRotationCorrection(TankTreading):
         """
         
         # Set same quantities as superclass.
-        super().set_time_dependent_quantitites(t0, tend, dv, omega, x, v, init)
+        super().set_time_dependent_quantitites(t0, tend, time_points, dv, omega, x, v, init)
 
         # Additionally set position measure and velocity.
         if x is None:
