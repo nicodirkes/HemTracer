@@ -697,7 +697,7 @@ class PathlineReader (PathlineCollection):
             
             if self._velocity_gradient_name:
                 dv = np.asarray([ pl_data_id[name] if name else zeros for name in vel_grad_names ]).T
-                pl.add_attribute(t, dv, self._velocity_gradient_name)
+                pl.add_attribute(t, dv, self._velocity_gradient_name, interpolation_scheme='previous')
             
             if self._omega_frame_name:
                 omega = np.asarray([ pl_data_id[name] if name else zeros for name in omega_names ]).T
