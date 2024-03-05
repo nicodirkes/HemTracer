@@ -110,7 +110,7 @@ class PowerLawModel:
         :rtype: NDArray
         """
 
-        tau = np.squeeze(self._mu * G[:-1])
+        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
 
         IH = np.zeros_like(t)
@@ -132,7 +132,7 @@ class PowerLawModel:
 
         IH = np.zeros_like(t)
 
-        tau = np.squeeze(self._mu * G[:-1])
+        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
         t_power = t[1:]**(self._alpha-1)
         IH[1:] = self._C * self._alpha * np.cumsum(t_power * tau**self._beta * dt)
@@ -154,7 +154,7 @@ class PowerLawModel:
         IH = np.zeros_like(t)
 
 
-        tau = np.squeeze(self._mu * G[:-1])
+        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
         partial_sum = np.cumsum(dt * tau**(self._beta/self._alpha))
         IH[1:] = self._C * partial_sum**self._alpha
