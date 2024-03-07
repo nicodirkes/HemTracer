@@ -555,7 +555,8 @@ class PathlineReader (PathlineCollection):
                     dvY_dx_name: str | None = None, dvY_dy_name: str | None = None, dvY_dz_name: str | None = None,
                     dvZ_dx_name: str | None = None, dvZ_dy_name: str | None = None, dvZ_dz_name: str | None = None,
                     omegaX_name: str | None = None, omegaY_name: str | None = None, omegaZ_name: str | None = None,
-                    distance_center_name: str | None = None, idx: List[int] | None = None) -> None:
+                    distance_center_name: str | None = None, idx: List[int] | None = None,
+                    gradient_interp: str = 'previous') -> None:
         """
         :param filename: The name of the file to read from.
         :type filename: str
@@ -603,6 +604,8 @@ class PathlineReader (PathlineCollection):
         :type distance_center_name: str | None
         :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read. Defaults to None.
         :type idx: List[int] | None
+        :param gradient_interp: The interpolation scheme to use for the velocity gradient field. Defaults to 'previous'.
+        :type gradient_interp: str
         """
 
         super().__init__()
@@ -639,10 +642,10 @@ class PathlineReader (PathlineCollection):
                 raise ValueError('Unsupported file extension. Supported extensions are .csv')
         
         # Read from file.
-        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx)
+        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx, gradient_interp)
     
     def _read_csv(self, filename: str, id_name: str, t_name: str, 
-                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None) -> None:
+                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None, gradient_interp: str = 'previous') -> None:
         """
         Read pathlines from CSV file.
 
@@ -664,6 +667,8 @@ class PathlineReader (PathlineCollection):
         :type distance_center_name: str | None
         :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read.
         :type idx: List[int] | None
+        :param gradient_interp: The interpolation scheme to use for the velocity gradient field. Defaults to 'previous'.
+        :type gradient_interp: str
         """
 
         # Read from file.
@@ -697,7 +702,7 @@ class PathlineReader (PathlineCollection):
             
             if self._velocity_gradient_name:
                 dv = np.asarray([ pl_data_id[name] if name else zeros for name in vel_grad_names ]).T
-                pl.add_attribute(t, dv, self._velocity_gradient_name, interpolation_scheme='previous')
+                pl.add_attribute(t, dv, self._velocity_gradient_name, interpolation_scheme=gradient_interp)
             
             if self._omega_frame_name:
                 omega = np.asarray([ pl_data_id[name] if name else zeros for name in omega_names ]).T
