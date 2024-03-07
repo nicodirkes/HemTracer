@@ -80,12 +80,14 @@ class HemolysisSolver:
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
 
-    def compute_hemolysis(self, powerlaw_model: PowerLawModel) -> None:
+    def compute_hemolysis(self, powerlaw_model: PowerLawModel, visc: float|str = 0.0035) -> None:
         """
         Computes index of hemolysis along pathlines in percent.
 
         :param powerlaw_model: Power law model to use for computing index of hemolysis.
         :type powerlaw_model: PowerLawModel
+        :param visc: Blood viscosity. Defaults to 0.0035 Pa s. If a string is given, it is assumed to be the name of an attribute containing the (local) dynamic viscosity.
+        :type visc: float | str
         """
 
         cell_model_solutions = self._pathlines.get_attribute(powerlaw_model.get_scalar_shear_name())
@@ -97,11 +99,19 @@ class HemolysisSolver:
         print('Computing ' + powerlaw_model.get_attribute_name() + ' along pathlines')
         for (sol, pl) in zip(cell_model_solutions, pathlines):
             
-            
             t = sol['t']
             G = sol['y']
 
-            IH = powerlaw_model.compute_hemolysis(t, G)
+            if isinstance(visc, str):
+                mu_interp = pl.get_attribute_interpolator(visc)
+                if mu_interp is None:
+                    raise AttributeError('No attribute named ' + visc + ' found on pathlines.')
+                else:
+                    mu = np.squeeze(mu_interp(t))
+            else:
+                mu = visc * np.ones_like(t)
+
+            IH = powerlaw_model.compute_hemolysis(t, G, mu)
             
             pl.add_attribute(t, IH, powerlaw_model.get_attribute_name())
 

@@ -38,7 +38,7 @@ class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
     """
 
-    def __init__(self, scalar_shear: RBCModel | str, hemolysis_correlation: IHCorrelation = IHCorrelation.GIERSIEPEN, mu: float = 3.5e-3, integration_scheme: str = 'basic') -> None:
+    def __init__(self, scalar_shear: RBCModel | str, hemolysis_correlation: IHCorrelation = IHCorrelation.GIERSIEPEN, mu: float | str = 3.5e-3, integration_scheme: str = 'basic') -> None:
         """
         Initialization defines all parameters to use. They cannot be changed afterwards.
 
@@ -46,8 +46,8 @@ class PowerLawModel:
         :type scalar_shear: RBCModel | str
         :param hemolysis_correlation: Hemolysis correlation to use.
         :type hemolysis_correlation: HemolysisCorrelation
-        :param mu: Dynamic viscosity of blood. Defaults to 3.5e-3.
-        :type mu: float
+        :param mu: Dynamic viscosity of blood. Defaults to 3.5e-3. If a string is given, it is assumed to be the name of an attribute containing the (local) dynamic viscosity.
+        :type mu: float | str
         :param integration_scheme: Integration scheme for hemolysis correlation. Integration schemes defined according to Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. Valid options are 'basic' (HI1), 'timeDiff' (HI2), 'linearized' (HI3), 'mechDose' (HI4), 'effTime' (HI5). Defaults to 'basic'.
         :type integration_scheme: str
         """
@@ -84,7 +84,7 @@ class PowerLawModel:
             case _:
                 raise ValueError('Unknown integration scheme.')
     
-    def compute_hemolysis(self, t: NDArray, G: NDArray) -> NDArray:
+    def compute_hemolysis(self, t: NDArray, G: NDArray, mu: NDArray) -> NDArray:
         """
         Compute hemolysis along pathline. Called by :class:`HemolysisSolver`.
 
@@ -92,113 +92,109 @@ class PowerLawModel:
         :type t: NDArray
         :param G: Scalar shear rate.
         :type G: NDArray
+        :param mu: Dynamic viscosity.
+        :type mu: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
-        return self._compute_IH(t, G)
+        return self._compute_IH(t, np.squeeze(G)*np.squeeze(mu))
     
-    def _compute_HI1(self, t: NDArray, G: NDArray) -> NDArray:
+    def _compute_HI1(self, t: NDArray, tau: NDArray) -> NDArray:
         """
         Computes index of hemolysis by directly integrating experimental correlation.
 
         :param t: Time steps.
         :type t: NDArray
-        :param G: Scalar shear rate.
-        :type G: NDArray
+        :param tau: Scalar representative stress.
+        :type tau: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
-        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
 
         IH = np.zeros_like(t)
-        IH[1:] = np.cumsum(self._C * dt**self._alpha * tau**self._beta)
+        IH[1:] = np.cumsum(self._C * dt**self._alpha * tau[1:]**self._beta)
 
         return IH
     
-    def _compute_HI2(self, t: NDArray, G: NDArray) -> NDArray:
+    def _compute_HI2(self, t: NDArray, tau: NDArray) -> NDArray:
         """
         Computes index of hemolysis by incorporating time derivative in experimental correlation.
 
         :param t: Time steps.
         :type t: NDArray
-        :param G: Scalar shear rate.
-        :type G: NDArray
+        :param tau: Scalar representative stress.
+        :type tau: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         IH = np.zeros_like(t)
 
-        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
         t_power = t[1:]**(self._alpha-1)
-        IH[1:] = self._C * self._alpha * np.cumsum(t_power * tau**self._beta * dt)
+        IH[1:] = self._C * self._alpha * np.cumsum(t_power * tau[1:]**self._beta * dt)
 
         return IH
 
-    def _compute_HI3(self, t: NDArray, G: NDArray) -> NDArray:
+    def _compute_HI3(self, t: NDArray, tau: NDArray) -> NDArray:
         """
         Computes index of hemolysis by summing linearized damage.
 
         :param t: Time steps.
         :type t: NDArray
-        :param G: Scalar shear rate.
-        :type G: NDArray
+        :param tau: Scalar representative stress.
+        :type tau: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         IH = np.zeros_like(t)
 
-
-        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
-        partial_sum = np.cumsum(dt * tau**(self._beta/self._alpha))
+        partial_sum = np.cumsum(dt * tau[1:]**(self._beta/self._alpha))
         IH[1:] = self._C * partial_sum**self._alpha
 
         return IH
     
-    def _compute_HI4(self, t: NDArray, G: NDArray) -> NDArray:
+    def _compute_HI4(self, t: NDArray, tau: NDArray) -> NDArray:
         """
         Computes index of hemolysis by accumulating mechanical dose (Grigioni et al. :cite:p:`grigioniNovelFormulationBlood2005`).
 
         :param t: Time steps.
         :type t: NDArray
-        :param G: Scalar shear rate.
-        :type G: NDArray
+        :param tau: Scalar representative stress.
+        :type tau: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         D0 = 0      # Initial dose (can be defined differently to account for damage accumulation)
 
-        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
-        partial_sum = np.cumsum(dt * tau**(self._beta/self._alpha)) + D0
+        partial_sum = np.cumsum(dt * tau[1:]**(self._beta/self._alpha)) + D0
         IH = np.zeros_like(t)
-        IH[1:] = self._alpha * self._C * partial_sum**(self._alpha-1) * tau**(self._beta/self._alpha) * dt
+        IH[1:] = self._alpha * self._C * partial_sum**(self._alpha-1) * tau[1:]**(self._beta/self._alpha) * dt
 
         return IH
     
-    def _compute_HI5(self, t: NDArray, G: NDArray) -> NDArray:
+    def _compute_HI5(self, t: NDArray, tau: NDArray) -> NDArray:
         """
         Computes index of hemolysis by using virtual time step approach (Goubergrits and Affeld :cite:p:`goubergritsNumericalEstimationBlood2004`).
 
         :param t: Time steps.
         :type t: NDArray
-        :param G: Scalar shear rate.
-        :type G: NDArray
+        :param tau: Scalar representative stress.
+        :type tau: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         IH = np.zeros_like(t)
-        tau = np.squeeze(self._mu * G[1:])
         dt = np.diff(t)
-        C_tau_beta = self._C * tau**self._beta
+        C_tau_beta = self._C * tau[1:]**self._beta
 
         for i in range(1, len(t)-1):
             t_eff = (IH[i-1] / C_tau_beta[i-1])**(1/self._alpha)
