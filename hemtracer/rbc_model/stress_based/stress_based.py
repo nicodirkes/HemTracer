@@ -19,6 +19,7 @@ class StressBasedModel(RBCModel):
     def set_sampling_rate(self, sampling_rate: float) -> None:
         """
         Set sampling rate of velocity gradients along pathline for stress-based model.
+        If sampling rate is positive, it is interpreted as the time interval between two consecutive samples. If sampling rate is negative, it is interpreted as the number of samples per time interval.
 
         :param sampling_rate: Sampling rate.
         :type sampling_rate: float
@@ -36,7 +37,15 @@ class StressBasedModel(RBCModel):
         """
 
         if self._sampling_rate is not None:
-            t = np.arange(self._t0, self._tend, self._sampling_rate)
+            if self._sampling_rate > 0:
+                t = np.arange(self._t0, self._tend, self._sampling_rate)
+            else: # subsample given time points
+                if self._time_points is None:
+                    raise AttributeError('No time points defined.')
+                n = abs(int(self._sampling_rate)) # number of time points in each interval
+                t = []
+                for i in range(1, len(self._time_points)):
+                    t.extend(np.linspace(self._time_points[i-1], self._time_points[i], n, endpoint=False))
         else:
             if self._time_points is None:
                 raise AttributeError('No time points defined.')
