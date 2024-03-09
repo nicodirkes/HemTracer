@@ -46,6 +46,7 @@ class StressBasedModel(RBCModel):
                 t = []
                 for i in range(1, len(self._time_points)):
                     t.extend(np.linspace(self._time_points[i-1], self._time_points[i], n, endpoint=False))
+                t = np.asarray(t)
         else:
             if self._time_points is None:
                 raise AttributeError('No time points defined.')
