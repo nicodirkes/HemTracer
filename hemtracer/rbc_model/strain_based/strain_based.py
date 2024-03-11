@@ -238,7 +238,7 @@ class StrainBasedModel(RBCModel):
         :rtype: Tuple[Tensor3, Tensor3, Tensor3]
         """
 
-        dv_i = self._dv(t).reshape(3, 3).T
+        dv_i = self._dv(t).reshape(3, 3)
         E = 0.5 * (dv_i + dv_i.T)
         W = 0.5 * (dv_i - dv_i.T)
         Om = self._unpack_antisymmetric(self._omega(t))
