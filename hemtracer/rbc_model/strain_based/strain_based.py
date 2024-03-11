@@ -126,14 +126,14 @@ class StrainBasedModel(RBCModel):
         self._first_step = first_step
         self._max_step = max_step
 
-    def compute_representative_shear(self) -> Tuple[NDArray, NDArray]:
+    def compute_representative_shear(self) -> Tuple[NDArray, NDArray, NDArray]:
         """
         Solve strain-based model, return effective shear rate and chosen time steps.
         Called by :class:`hemtracer.hemolysis_solver.HemolysisSolver`.
 
         :meta private:
-        :return: Time steps and Effective shear rate.
-        :rtype: Tuple[NDArray, NDArray]
+        :return: Time steps and Effective shear rate and model solution.
+        :rtype: Tuple[NDArray, NDArray, NDArray]
         """
 
         result = solve_ivp(self._RHS, (self._t0, self._tend), self._initial_condition(), method=self._method, atol=self._atol, rtol=self._rtol, first_step=self._first_step, max_step=self._max_step)
@@ -141,7 +141,7 @@ class StrainBasedModel(RBCModel):
         sol = np.transpose(result.y)
         Geff = self._compute_Geff_from_sol(sol)
 
-        return (t, Geff)
+        return (t, Geff, sol)
 
     def _initial_condition_undeformed(self) -> NDArray:
         """

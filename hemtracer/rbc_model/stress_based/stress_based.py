@@ -27,13 +27,13 @@ class StressBasedModel(RBCModel):
 
         self._sampling_rate = sampling_rate
     
-    def compute_representative_shear(self) -> Tuple[NDArray, NDArray]:
+    def compute_representative_shear(self) -> Tuple[NDArray, NDArray, None]:
         """
         Compute representative scalar shear rate from flow field. Called by :class:`HemolysisSolver`.
 
         :meta private:
-        :return: Tuple containing time steps and representative scalar shear rate.
-        :rtype: Tuple[NDArray, NDArray]
+        :return: Tuple containing time steps and representative scalar shear rate and None, as no ODE solution is computed.
+        :rtype: Tuple[NDArray, NDArray, None]
         """
 
         if self._sampling_rate is not None:
@@ -54,7 +54,7 @@ class StressBasedModel(RBCModel):
 
         G = np.asarray([self._compute_representative_shear(self._compute_strain_tensor(ti)) for ti in t])
 
-        return (t, G)
+        return (t, G, None)
 
     def _compute_representative_shear(self, E: Tensor3) -> float:
         """

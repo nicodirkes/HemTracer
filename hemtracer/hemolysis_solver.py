@@ -33,12 +33,14 @@ class HemolysisSolver:
         self._r_name = self._pathlines.get_name_distance_center() # Orthogonal distance to center of rotation.
 
 
-    def compute_representativeShear(self, model: RBCModel) -> None:
+    def compute_representativeShear(self, model: RBCModel, store_solution: bool = False) -> None:
         """
         Obtain representative scalar shear rate (effective shear) from stress-based or strain-based cell model.
 
         :param model: Cell model to use.
         :type model: RBCModel
+        :param store_solution: Store solution in pathlines. Defaults to False.
+        :type store_solution: bool
         """
 
         i=0
@@ -71,10 +73,17 @@ class HemolysisSolver:
             model.set_time_dependent_quantitites(t0, tend, ti, dv, om, r, v, init)
 
             # Solve model.
-            (t, G_rep) = model.compute_representative_shear()
+            (t, G_rep, sol) = model.compute_representative_shear()
 
             # Store Geff in pathline.
             pathline.add_attribute(t, G_rep, G_rep_name)
+
+            # Store solution if requested.
+            if store_solution:
+                if sol is None:
+                    raise AttributeError('No solution available for ' + model.get_name() + ' model.')
+                for i in range(sol.shape[1]):
+                    pathline.add_attribute(t, sol[:,i], model.get_name() + '_sol_' + str(i))
 
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')

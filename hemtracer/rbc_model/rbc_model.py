@@ -125,12 +125,13 @@ class RBCModel:
 
         return 'G_' + self.get_name()
     
-    def compute_representative_shear(self) -> Tuple[NDArray, NDArray]:
+    def compute_representative_shear(self) -> Tuple[NDArray, NDArray, NDArray|None]:
         """
-        Solve blood damage model to compute scalar shear rate and return times and scalar shear rate along pathline.
+        Solve blood damage model to compute scalar shear rate and return times and scalar shear rate along pathline. 
+        The third return can be used to return the solution of ODE models.
 
         :return: Tuple of times and scalar shear rate along pathline.
-        :rtype: Tuple[NDArray, NDArray]
+        :rtype: Tuple[NDArray, NDArray, NDArray|None]
         """
 
         raise NotImplementedError('compute_representative_shear has to be implemented in subclasses.')
