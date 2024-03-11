@@ -53,28 +53,36 @@ class StrainBasedModel(RBCModel):
 
         self._coeffs = coeffs
 
-    def set_initial_condition(self, type: str = 'undeformed') -> None:
+    def set_initial_condition(self, type: str = 'undeformed', value: str|float|NDArray|None = None) -> None:
         """
         Set initial condition for strain-based model.
 
-        :param type: Type of initial condition, i.e., shape of cells at the start of the pathline. Currently supported: undeformed, steadyShear, specificShear. 'undeformed' represents an undeformed, i.e., spherical cell. 'steadyShear' represents the steady state for a simple shear flow. The shear rate is computed using the second invariant of the strain tensor at the initial position. 'specificShear' requires a second word that describes the attribute to take the specific shear rate from, e.g., 'specificShear Geff'. It then deforms the cell to correspond to that particular scalar shear rate at the beginning. Defaults to 'undeformed'.
+        :param type: Type of initial condition, i.e., shape of cells at the start of the pathline. Currently supported: undeformed, steadyShear, specificShear, solutionVector. 'undeformed' represents an undeformed, i.e., spherical cell. 'steadyShear' represents the steady state for a simple shear flow. The shear rate is computed using the second invariant of the strain tensor at the initial position. 'specificShear' requires another input in value that can be either a string specifying attribute to take the shear rate from, e.g., 'Geff', or a scalar floating point value that specifies the shear rate. It then deforms the cell to correspond to that particular scalar shear rate at the beginning. 'solutionVector' allows the user to specify an initial condition directly for the solution variables of the ODE. Defaults to 'undeformed'.
         :type type: str
         :param val: Value for initial condition, if applicable. Defaults to None.
-        :type val: float, optional
+        :type val: str|float|NDArray|None
         """
 
-        type_split = type.split()
-        type_str = type_split[0]
-        match type_str:
+        match type:
             case 'undeformed':
                 self._initial_condition = self._initial_condition_undeformed
             case 'steadyShear':
                 self._initial_condition = self._initial_condition_steadyShear
             case 'specificShear':
-                if len(type_split) == 1:
-                    raise ValueError('specificShear initial condition requires an additional argument specifying the name of the attribute to use for shear rate.')
-                attribute_name = type_split[1]
-                self._initial_condition = lambda : self._initial_condition_shearRateAttribute(attribute_name)
+                if value is None:
+                    raise ValueError('Value for specific shear initial condition not given.')
+                if isinstance(value, str):
+                    self._initial_condition = lambda : self._initial_condition_shearRateAttribute(value)
+                elif isinstance(value, float):
+                    self._initial_condition = lambda : self._initial_condition_shear(value)
+                else:
+                    raise ValueError('Value for specific shear initial condition has to be a string or a float.')
+            case 'solutionVector':
+                if value is None:
+                    raise ValueError('Value for solution vector initial condition not given.')
+                if not isinstance(value, np.ndarray):
+                    raise ValueError('Value for solution vector initial condition has to be a numpy array.')
+                self._initial_condition = lambda : value
             case _:
                 raise ValueError('Initial condition type unknown.')
             
