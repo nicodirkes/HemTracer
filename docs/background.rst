@@ -36,7 +36,7 @@ The governing equations are:
 
 Here, :math:`\tilde{\mathbf{E}} = \mathbf{Q}^\mathrm{T} \mathbf{E} \mathbf{Q}` and :math:`\tilde{\mathbf{W}} = \mathbf{Q}^\mathrm{T} \mathbf{W} \mathbf{Q}` are the transformed strain and vorticity tensors, respectively.
 
-This is implemented as :class:`hemtracer.rbc_model.strain_based.AroraFullEig`.
+This is implemented as :class:`hemtracer.rbc_model.strain_based.AroraFullEig`. The default coefficients, i.e., those corresponding to the original Arora model, are :math:`f_1 = 5.0 \, \mathrm{s}^{-1}`, :math:`f_2 = 4.2298 \cdot 10^{-3}`, :math:`\tilde{f_2} = \tilde{f_3} = 1.0`.
 
 .. _arora-simplified-model:
 
