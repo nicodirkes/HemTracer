@@ -56,7 +56,7 @@ This is implemented as :class:`hemtracer.rbc_model.strain_based.AroraSimplified`
 Tank-treading model
 ^^^^^^^^^^^^^^^^^^^
 
-This model was derived by Dirkes et al. :cite:p:`dirkesEulerianFormulationTensorBased` by replacing the differential equation for the orientation tensor Q by an algebraic equation for steady orientation. The model is generally more efficient than the full Eulerian reformulation and more robust, as it contains only the eigenvalues (3 DoF's). The governing equations are
+This model was derived by Dirkes et al. :cite:p:`dirkesEulerianFormulationTensorBased` by replacing the differential equation for the orientation tensor Q by an algebraic equation for equilibrium orientation. The model is generally more efficient than the full Eulerian reformulation and more robust, as it contains only the eigenvalues (3 DoF's). The governing equations are
 
 .. math::
     :nowrap:
@@ -66,8 +66,8 @@ This model was derived by Dirkes et al. :cite:p:`dirkesEulerianFormulationTensor
     \\
     \mathbf Q & = &
     \begin{cases}
-        \mathbf Q^\mathrm{steady} & \text{if cell is tank-treading} \\
-        \mathbf 0 & \text{if cell is tumbling}
+        \mathbf Q_\star & \text{tank-treading} \\
+        \mathbf 0 & \text{tumbling}
     \end{cases} \, , \qquad \mathrm{with} \quad
     \tilde{\mathbf{E}} = \mathbf{Q}^\mathrm{T} \mathbf{E} \mathbf{Q} \, ,
     \end{eqnarray}
