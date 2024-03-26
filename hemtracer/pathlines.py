@@ -687,8 +687,8 @@ class PathlineReader (PathlineCollection):
         # Read data.
         for pathline_id in pathline_ids:
 
-            # Get data for pathline.
-            pl_data_id = pl_data[pl_data[id_name] == pathline_id]
+            # Get data for pathline, sorted by time.
+            pl_data_id = pl_data[pl_data[id_name] == pathline_id].sort_values(by=t_name)
             t = list(pl_data_id[t_name])
             zeros = np.zeros(len(t))
             x = list(np.asarray([ pl_data_id[name] if name else zeros for name in pos_names ]).T)
