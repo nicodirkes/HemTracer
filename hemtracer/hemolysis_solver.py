@@ -140,17 +140,48 @@ class HemolysisSolver:
 
         return self._pathlines.get_attribute(model.get_attribute_name())
     
-    def average_hemolysis(self, model: PowerLawModel) -> float:
+    def average_hemolysis(self, model: PowerLawModel, end_criterion_attribute: str | None = None, end_criterion_value: float = 0.0) -> float:
         """
         Average hemolysis index over the end points of all pathlines.
 
         :param model: Power law model to use.
         :type model: PowerLawModel
+        :param end_criterion_name: Criterion for selecting end points. Can be a string representing an attribute name. If given, uses the first time point where the attribute is greater than end_criterion_value as end point. Discards all pathlines where the criterion is not met. Defaults to None.
+        :type end_criterion: str | None
+        :param end_criterion_value: Value to use as end criterion. Defaults to 0.0.
+        :type end_criterion_value: float
         :return: Average hemolysis index.
         :rtype: float
         """
 
-        IHs = self._pathlines.get_attribute(model.get_attribute_name())
-        IHs_end = [IH['y'][-1] for IH in IHs]
+        IHs_end = []
+
+        # if end_criterion_attribute is given, use it to select end points
+        if end_criterion_attribute is not None:
+
+            # get end criterion values for all pathlines
+            end_criterion_list = self._pathlines.get_attribute(end_criterion_attribute)
+            if end_criterion_list is None:
+                raise AttributeError('No attribute named ' + end_criterion_attribute + ' found on pathlines.')
+            
+            # loop over pathlines
+            for (i_pl,end_criterion_pl) in enumerate(end_criterion_list):
+
+                # find index of first time point where end_criterion is greater than zero
+                end_criterion = end_criterion_pl['y']
+                t = end_criterion_pl['t']
+                idx = np.argmax(end_criterion > end_criterion_value)
+
+                # get IH at this time point
+                t_end = t[idx]
+                IH_pl = self._pathlines.get_pathlines()[i_pl].get_attribute_interpolator(model.get_attribute_name())
+                if IH_pl is None:
+                    raise AttributeError('No attribute named ' + model.get_attribute_name() + ' found on pathlines.')
+                IHs_end.append(IH_pl(t_end))
+
+        # otherwise, use the last time point for each pathline
+        else:
+            IHs = self._pathlines.get_attribute(model.get_attribute_name())
+            IHs_end = [IH['y'][-1] for IH in IHs]
 
         return float(np.mean(IHs_end))
