@@ -411,6 +411,11 @@ class PathlineCollection:
                 writer = self._write_npz
             case 'vtk':
                 writer = self._write_vtk
+                # requires position attribute
+                if attribute_names is not None and position_name not in attribute_names:
+                    # add position attribute to list
+                    attribute_names = [position_name] + attribute_names
+                    pathlines = [ pathline.unify_attributes(attribute_names) for pathline in self._pathlines ]
             case _:
                 raise ValueError('Unsupported file extension. Supported extensions are .csv, .npz, and .vtk.')
         
