@@ -81,7 +81,8 @@ class HemolysisSolver:
             # Store solution if requested.
             if store_solution:
                 if sol is None:
-                    raise AttributeError('No solution available for ' + model.get_name() + ' model.')
+                    raise AttributeError('No solution available for ' + model.get_name() + ' model. ' +
+                    'This feature is intended for strain-based models.')
                 for i in range(sol.shape[1]):
                     pathline.add_attribute(t, sol[:,i], model.get_name() + '_sol_' + str(i))
 
