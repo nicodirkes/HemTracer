@@ -18,4 +18,4 @@ The package is meant for steady flow data. Rotational flows such as those presen
 
 How to cite
 -----------
-Some more information on the underlying theory can be found in :cite:`dirkesEulerianFormulationTensorBased`. If you use this package in your work, please reference this paper.
+More information on the underlying theory can be found in :cite:t:`dirkesEulerianFormulationTensorBased`. If you use this package in your work, please reference this paper.
