@@ -15,3 +15,7 @@ The package is written in Python and uses `VTK <https://vtk.org/>`_ to process t
 I am currently using the package to post-process Eulerian flow data from our in-house finite-element solver :code:`XNS`. I am further planning on extending compatibility to :code:`.vtu` files (COMSOL) and :code:`.cgns` files (ANSYS Fluent, Star-CCM). If you are interested in using the package with a different solver, please let me know and I will try to accommodate your needs.
 
 The package is meant for steady flow data. Rotational flows such as those present in most blood pumps are meant to be handled using the MRF approach to enable a steady solution. Transient flow data needs to be averaged in time to obtain quasi-MRF data before being processed by this package.
+
+How to cite
+-----------
+Some more information on the underlying theory can be found in :cite:`dirkesEulerianFormulationTensorBased`. If you use this package in your work, please reference this paper.
