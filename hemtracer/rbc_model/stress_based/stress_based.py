@@ -196,3 +196,63 @@ class SecondInvariant(StressBasedModel):
         """
 
         return self._compute_shear_rate_second_invariant(E)
+    
+class BludszuweitShear(StressBasedModel):
+
+    def get_name(self) -> str:
+        """
+        Get name of blood damage model.
+
+        :return: Name of the blood damage model.
+        :rtype: str
+        """
+
+        return 'bludszuweit-shear'
+
+    def _compute_representative_shear(self, E: Tensor3) -> float:
+        """
+        Reduce 3D strain tensor to representative scalar shear rate using second strain invariant.
+
+        :param E: 3D strain tensor.
+        :type E: Tensor3
+        :return: Scalar shear rate.
+        :rtype: float
+        """
+
+        t_xy = E[0,1]
+        t_xz = E[0,2]
+        t_yz = E[1,2]
+
+        G = 2 * np.sqrt(t_xy**2   + t_xz**2   + t_yz**2  )
+        return G
+    
+class BludszuweitNormal(StressBasedModel):
+
+    def get_name(self) -> str:
+        """
+        Get name of blood damage model.
+
+        :return: Name of the blood damage model.
+        :rtype: str
+        """
+
+        return 'bludszuweit-normal'
+
+    def _compute_representative_shear(self, E: Tensor3) -> float:
+        """
+        Reduce 3D strain tensor to representative scalar shear rate using second strain invariant.
+
+        :param E: 3D strain tensor.
+        :type E: Tensor3
+        :return: Scalar shear rate.
+        :rtype: float
+        """
+
+        s_xx = E[0,0]
+        s_yy = E[1,1]
+        s_zz = E[2,2]
+
+        G = 2/np.sqrt(3) * np.sqrt(
+                (s_xx**2   + s_yy**2   + s_zz**2  ) 
+            -   (s_xx*s_yy + s_xx*s_zz + s_yy*s_zz))
+        return G
