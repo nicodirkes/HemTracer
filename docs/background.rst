@@ -72,7 +72,9 @@ This model was derived by Dirkes et al. :cite:p:`dirkesEulerianFormulationTensor
     \tilde{\mathbf{E}} = \mathbf{Q}^\mathrm{T} \mathbf{E} \mathbf{Q} \, ,
     \end{eqnarray}
 
-This is implemented as :class:`hemtracer.rbc_model.strain_based.TankTreading`.
+This is implemented as :class:`hemtracer.rbc_model.strain_based.TankTreading`. 
+
+Please also note the :ref:`corrigendum`
 
 .. _stress-based-models:
 

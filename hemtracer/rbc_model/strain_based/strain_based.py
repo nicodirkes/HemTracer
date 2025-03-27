@@ -695,7 +695,9 @@ class AroraFullEig(MorphologyEigFormulation):
     
 class TankTreading(MorphologyEigFormulation):
     r"""
-    Represents the tank-treading cell deformation model (see :ref:`tanktreading-model`), 
+    Represents the tank-treading cell deformation model (see :ref:`tanktreading-model`).
+    The implementation here is based on the correct equations. In the paper, there is a small
+    mistake in the equations (see :ref:`corrigendum`).
     """
 
     def __init__(self) -> None:
@@ -783,7 +785,8 @@ class TankTreading(MorphologyEigFormulation):
     def _getSteadyOrientation2D(self, Eii: float, Eij: float, Ejj: float, 
                                 Wij: float, li: float, lj: float) -> float | None:
         """
-        Computes the steady orientation for a 2D ellipse.
+        Computes the steady orientation for a 2D ellipse. 
+        Please note that the definitions of 'a' and 'b' need to be switched compared to the paper.
 
         :param Eii: Diagonal element of (symmetric) strain tensor.
         :type Eii: float
@@ -809,8 +812,8 @@ class TankTreading(MorphologyEigFormulation):
 
         dist = (lj + li) / (lj - li)
 
-        A = 0.5 * (Eii - Ejj) * dist
-        B = Eij * dist
+        A = 0.5 * (Eii - Ejj) * dist    # wrongly labeled as a in the paper
+        B = Eij * dist                  # wrongly labeled as a in the paper
         C = Wij
         BmC = B - C
 
