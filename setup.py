@@ -2,11 +2,13 @@
 
 from setuptools import setup, find_packages
 from version import _version
+from pathlib import Path
 
-with open('README.md') as f:
+this_directory = Path(__file__).parent
+with open(this_directory / 'README.md', encoding='utf-8') as f:
     readme = f.read()
 
-with open('LICENSE') as f:
+with open(this_directory / 'LICENSE', encoding='utf-8') as f:
     license = f.read()
 
 setup(
