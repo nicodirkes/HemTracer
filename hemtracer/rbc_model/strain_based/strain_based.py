@@ -38,7 +38,9 @@ class StrainBasedModel(RBCModel):
         super().__init__()
 
         # initialize attributes
-        self._coeffs = MorphologyModelCoefficients.ARORA # Coefficients for morphology model
+        self._coeffs = MorphologyModelCoefficients.ARORA    # Coefficients for morphology model
+        self._use_representative_fluid_stress = False       # Use representative fluid stress attribute instead of full velocity gradient.
+        self._representative_fluid_stress_viscosity = 0.0035 # Viscosity to convert stress to shear rate.
 
         self.set_initial_condition()
         self.configure_ODE_solver()
@@ -52,6 +54,19 @@ class StrainBasedModel(RBCModel):
         """
 
         self._coeffs = coeffs
+
+    def use_representative_fluid_stress(self, use: bool = True, viscosity: float = 0.0035) -> None:
+        """
+        Configure model to use representative fluid stress attribute instead of full velocity gradient. This is only relevant for the Kelvin-Voigt model.
+
+        :param use: Whether to use representative fluid stress. Defaults to True.
+        :type use: bool
+        :param viscosity: Viscosity to convert stress to shear rate. Defaults to 0.0035 Pa.s.
+        :type viscosity: float
+        """
+
+        self._use_representative_fluid_stress = use
+        self._representative_fluid_stress_viscosity = viscosity
 
     def set_initial_condition(self, type: str = 'undeformed', value: str|float|NDArray|None = None) -> None:
         """
@@ -238,7 +253,16 @@ class StrainBasedModel(RBCModel):
         :rtype: Tuple[Tensor3, Tensor3, Tensor3]
         """
 
-        dv_i = self._dv(t).reshape(3, 3)
+        if self._use_representative_fluid_stress or self._dv is None:
+            if self._representative_fluid_stress is None:
+                raise AttributeError('No representative fluid stress available for strain-based model.')
+
+            # Construct shear rate only tensor
+            Gf = self._get_shear_rate_flow(t)
+            dv_i = np.array([[0, Gf, 0], [0, 0, 0], [0, 0, 0]])
+        else:
+            dv_i = self._dv(t).reshape(3, 3)
+
         E = 0.5 * (dv_i + dv_i.T)
         W = 0.5 * (dv_i - dv_i.T)
         Om = self._unpack_antisymmetric(self._omega(t))
@@ -272,18 +296,32 @@ class StrainBasedModel(RBCModel):
 
         raise NotImplementedError('RHS has to be implemented in subclasses.')
     
-    def _get_shear_rate_flow(self, t: float) -> float:
+    def _get_shear_rate_flow(self, t: float, bludszuweit: bool = False) -> float:
         """
         Compute shear rate from flow field at time t.
 
         :param t: Time.
         :type t: float
+        :param bludszuweit: Use Bludszuweit representative shear rate instead of second invariant. Defaults to False. Has no effect if representative fluid stress is used.
+        :type bludszuweit: bool
         :return: Shear rate.
         :rtype: float
         """
 
-        E = self._compute_strain_tensor(t)
-        G = self._compute_shear_rate_second_invariant(E)
+        # Use representative fluid stress if configured or if full velocity gradient is not available.
+        if self._use_representative_fluid_stress or self._dv is None:
+            if self._representative_fluid_stress is None:
+                raise AttributeError('No representative fluid stress available for strain-based model.')
+            stress = self._representative_fluid_stress(t)
+            G = stress / self._representative_fluid_stress_viscosity
+        
+        # Otherwise, compute from full velocity gradient.
+        else:
+            E = self._compute_strain_tensor(self._dv(t))
+            if bludszuweit:
+                G = self._compute_shear_rate_bludszuweit(E)
+            else:
+                G = self._compute_shear_rate_second_invariant(E)
 
         return G
     
@@ -968,7 +1006,8 @@ class TankTreadingRotationCorrection(TankTreading):
                                        dv: Callable[[float], Vector9] | None = None, 
                                        omega: Callable[[float], Vector3] | None = None, 
                                        x: Callable[[float], Vector3] | None = None, 
-                                       v: Callable[[float], Vector3] | None = None, 
+                                       v: Callable[[float], Vector3] | None = None,
+                                       representative_fluid_stress: Callable[[float], float] | None = None,
                                        init: Dict[str, float] | None = None) -> None:
         """
         Set time-dependent quantities for the cell model. Overrides superclass method to include position measure x and velocity v.
@@ -985,13 +1024,15 @@ class TankTreadingRotationCorrection(TankTreading):
         :type x: Callable[[float], Vector3]
         :param v: Time-dependent velocity.
         :type v: Callable[[float], Vector3]
+        :param representative_fluid_stress: Time-dependent representative stress, only used for Kelvin-Voigt model.
+        :type representative_fluid_stress: Callable[[float], float]
         :param init: Dict with initial values for attributes on pathline, only required for specific shear initial condition.
         :type init: Dict[str, float]
         :raises ValueError: If position measure x or velocity v is not provided.
         """
         
         # Set same quantities as superclass.
-        super().set_time_dependent_quantitites(t0, tend, time_points, dv, omega, x, v, init)
+        super().set_time_dependent_quantitites(t0, tend, time_points, dv, omega, x, v, representative_fluid_stress, init)
 
         # Additionally set position measure and velocity.
         if x is None:
@@ -1054,7 +1095,7 @@ class KelvinVoigt(StrainBasedModel):
         :rtype: NDArray
         """
 
-        return np.array([0.0])
+        return np.asarray([0.0])
     
     def _initial_condition_shear(self, G: float) -> NDArray:
         """
@@ -1066,7 +1107,22 @@ class KelvinVoigt(StrainBasedModel):
         :rtype: NDArray
         """
 
-        return np.array([G])
+        return np.asarray([G])
+    
+    def _compute_Geff_from_sol(self, sol: NDArray) -> NDArray:
+        """
+        Compute effective shear rate from solution of strain-based model.
+
+        :param sol: Solution of strain-based model.
+        :type sol: NDArray (n x ndf)
+        :return: Effective shear rate.
+        :rtype: NDArray (n x 1)
+        :rtype: NDArray
+        """
+
+        Geff = sol[:,0] # effective shear rate is the first (and only) entry
+        return Geff
+
     
     def _RHS(self, t: float, y: NDArray) -> NDArray:
         """
@@ -1080,9 +1136,8 @@ class KelvinVoigt(StrainBasedModel):
         :rtype: NDArray
         """
 
-        E, W, Om = self._compute_strain_vort_rot(t)  # fluid strain rate tensor
-        Gf = self._compute_shear_rate_bludszuweit(E) # fluid shear rate
-        Geff = y[0]                     # effective shear rate from solution
-        tau = 1.0 / self._coeffs.f1     # characteristic time scale
+        Gf = self._get_shear_rate_flow(t, bludszuweit=True) # shear rate from flow field
+        Geff = y[0]                                         # effective shear rate from solution
+        tau = 1.0 / self._coeffs.f1                         # characteristic time scale
 
         return np.array([(Gf - Geff) / tau])

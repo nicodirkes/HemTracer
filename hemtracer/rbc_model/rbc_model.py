@@ -16,6 +16,7 @@ class RBCModel:
                                        omega: Callable[[float],Vector3] | None = None, 
                                        x: Callable[[float], Vector3] | None = None,
                                        v: Callable[[float], Vector3] | None = None,
+                                       representative_fluid_stress: Callable[[float],float] | None = None,
                                        init: Dict[str, float] | None = None) -> None:
         """
         Set time-dependent quantities for scalar shear rate model and check if all required quantities are there. Start and end time as well as velocity gradient are always required. If omega is not defined, it is set to zero, assuming a stationary frame of reference. The tank-treading model with pathline additionally requires x and v. This is handled by :class:`hemtracer.hemolysis_solver.HemolysisSolver`.
@@ -35,6 +36,8 @@ class RBCModel:
         :type x: Callable[[float],Vector3]
         :param v: Velocity as a function of pathline time. Only required for tank-treading with pathline correction.
         :type v: Callable[[float],Vector3]
+        :param representative_fluid_stress: Representative fluid stress as a function of pathline time. Only used for Kelvin-Voigt model.
+        :type representative_fluid_stress: Callable[[float],float] | None
         :param init: Dict with initial values for attributes on pathline, only required for specific shear initial condition.
         :type init: Dict[str, float]
         """
@@ -47,10 +50,6 @@ class RBCModel:
         # Check validity of start and end time.
         if t0 >= tend:
             raise ValueError('Start time has to be smaller than end time.')
-
-        # Velocity gradient is always required.
-        if dv is None:
-            raise ValueError('Velocity gradient not defined.')
         
         # If omega is not defined, set it to zero, assuming stationary frame of reference.
         if omega is None:
@@ -62,19 +61,20 @@ class RBCModel:
         self._time_points = time_points # Time points at which to sample velocity gradients.
         self._dv = dv # Velocity gradient tensor.
         self._omega = omega # MRF angular velocity vector.
+        self._representative_fluid_stress = representative_fluid_stress # Representative fluid stress, only used for Kelvin-Voigt model. 
         self._init = init # Initial values for attributes on pathline.
 
-    def _compute_strain_tensor(self, t: float) -> Tensor3:
+    def _compute_strain_tensor(self, dv: Vector9) -> Tensor3:
         """
         Compute strain tensor at time t.
 
-        :param t: Time.
-        :type t: float
+        :param dv: Velocity gradient tensor in vector form.
+        :type dv: Vector9
         :return: Strain tensor.
         :rtype: Tensor3
         """
 
-        dv_i = self._dv(t).reshape(3, 3).T
+        dv_i = dv.reshape(3, 3).T
         E = 0.5 * (dv_i + dv_i.T)
 
         return E
@@ -108,7 +108,7 @@ class RBCModel:
     def _compute_shear_rate_bludszuweit(self, E: Tensor3) -> float:
         """
         Compute shear rate from strain tensor using Bludszuweit representative stress.
-        
+
         :param E: Strain tensor.
         :type E: Tensor3
         :return: Shear rate.

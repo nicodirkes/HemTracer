@@ -2,7 +2,7 @@ from __future__ import annotations
 from hemtracer.rbc_model import RBCModel
 from hemtracer.hemolysis_model import PowerLawModel
 from hemtracer.pathlines import PathlineCollection
-from typing import List, Dict
+from typing import List, Dict, Callable
 from numpy.typing import NDArray
 import numpy as np
 
@@ -24,13 +24,11 @@ class HemolysisSolver:
         self._v_name = self._pathlines.get_name_velocity() # Velocity.
 
         dv_name = self._pathlines.get_name_velocity_gradient() # Velocity gradient.
-        if dv_name is None:
-            raise AttributeError('No velocity gradient data available on pathlines.')
-        else:
-            self._dv_name = dv_name
+        self._dv_name = dv_name
 
         self._omega_name = self._pathlines.get_name_omega_frame() # Angular velocity of frame of reference.
         self._r_name = self._pathlines.get_name_distance_center() # Orthogonal distance to center of rotation.
+        self._representative_fluid_stress_name = self._pathlines.get_name_representative_stress() # Representative fluid stress.
 
 
     def compute_representativeShear(self, model: RBCModel, store_solution: bool = False) -> None:
@@ -58,6 +56,11 @@ class HemolysisSolver:
             dv = pathline.get_attribute_interpolator(self._dv_name)
             r = pathline.get_attribute_interpolator(self._r_name)
             v = pathline.get_attribute_interpolator(self._v_name)
+            representative_fluid_stress = pathline.get_attribute_interpolator(self._representative_fluid_stress_name)
+            rep_stress_scalar: Callable[[float], float] | None = None
+            if representative_fluid_stress is not None:
+                stress_func = representative_fluid_stress
+                rep_stress_scalar = lambda t: float(np.squeeze(stress_func(t)))
 
             # Use position attribute as reference for time points.
             ti = pathline.get_position_attribute().t
@@ -70,7 +73,7 @@ class HemolysisSolver:
                     init[attr_name] = np.squeeze(interp(t0))
 
             # Give pathline information to model.
-            model.set_time_dependent_quantitites(t0, tend, ti, dv, om, r, v, init)
+            model.set_time_dependent_quantitites(t0, tend, ti, dv, om, r, v, rep_stress_scalar, init)
 
             # Solve model.
             (t, G_rep, sol) = model.compute_representative_shear()
