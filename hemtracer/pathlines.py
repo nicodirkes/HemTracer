@@ -561,7 +561,8 @@ class PathlineReader (PathlineCollection):
                     dvZ_dx_name: str | None = None, dvZ_dy_name: str | None = None, dvZ_dz_name: str | None = None,
                     omegaX_name: str | None = None, omegaY_name: str | None = None, omegaZ_name: str | None = None,
                     distance_center_name: str | None = None, idx: List[int] | None = None,
-                    gradient_interp: str = 'previous') -> None:
+                    gradient_interp: str = 'previous', 
+                    sep : str = ',') -> None:
         """
         :param filename: The name of the file to read from.
         :type filename: str
@@ -611,6 +612,8 @@ class PathlineReader (PathlineCollection):
         :type idx: List[int] | None
         :param gradient_interp: The interpolation scheme to use for the velocity gradient field. Defaults to 'previous'.
         :type gradient_interp: str
+        :param sep: The separator used in the CSV file. Defaults to ','.
+        :type sep: str
         """
 
         super().__init__()
@@ -647,10 +650,10 @@ class PathlineReader (PathlineCollection):
                 raise ValueError('Unsupported file extension. Supported extensions are .csv')
         
         # Read from file.
-        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx, gradient_interp)
+        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx, gradient_interp, sep)
     
     def _read_csv(self, filename: str, id_name: str, t_name: str, 
-                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None, gradient_interp: str = 'previous') -> None:
+                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None, gradient_interp: str = 'previous', sep: str = ',') -> None:
         """
         Read pathlines from CSV file.
 
@@ -674,11 +677,12 @@ class PathlineReader (PathlineCollection):
         :type idx: List[int] | None
         :param gradient_interp: The interpolation scheme to use for the velocity gradient field. Defaults to 'previous'.
         :type gradient_interp: str
+        :param sep: The separator used in the CSV file. Defaults to ','.
+        :type sep: str
         """
 
         # Read from file.
-        pl_data = pd.read_csv(filename)
-
+        pl_data = pd.read_csv(filename, sep=sep, dtype=float)
         # Find unique pathline IDs.
         pathline_ids = pl_data[id_name].unique()
 
