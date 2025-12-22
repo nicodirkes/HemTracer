@@ -327,7 +327,7 @@ class PathlineCollection:
     
     def get_attribute(self, attribute_name: str) -> List[Dict[str, NDArray]]:
         """
-        Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' for time and attribute, respectively.
+        Returns a list of dictionaries, each one representing a pathline and containing the keys 't' and 'y' and 'interp' for the integration times, values, and interpolator of the specified attribute.
 
         :param attribute_name: The name of the attribute to return.
         :type attribute: str
@@ -340,7 +340,7 @@ class PathlineCollection:
             attribute = pl.get_attribute(attribute_name)
             if attribute is None:
                 raise AttributeError('No attribute with name ' + attribute_name + ' found on pathline.')
-            dict_list.append({'t': attribute.t, 'y': attribute.val})
+            dict_list.append({'t': attribute.t, 'y': attribute.val, 'interp': attribute.interpolator})
 
         return dict_list
     

@@ -238,7 +238,7 @@ class PowerLawModel:
 
         return 'IH_' + self.get_name() + '_' + self._scalar_shear_name
     
-    def get_scalar_shear_name(self) -> str:
+    def get_effective_shear_name(self) -> str:
         """
         Get the name of the scalar shear rate attribute.
 
@@ -321,7 +321,7 @@ class PoreFormationModel:
 
         return self._fluid_shear_name
     
-    def compute_hemolysis(self, t: NDArray, G_eff: NDArray, tau_fluid: NDArray) -> NDArray:
+    def compute_hemolysis(self, t: NDArray, G_eff: NDArray, G_fluid: NDArray, mu: NDArray) -> NDArray:
         """
         Compute hemolysis along pathline. Called by :class:`HemolysisSolver`.
 
@@ -331,15 +331,19 @@ class PoreFormationModel:
         :type G_eff: NDArray
         :param G_fluid: Fluid scalar shear rate.
         :type G_fluid: NDArray
+        :param mu: Dynamic viscosity.
+        :type mu: NDArray
         :return: Hemolysis index.
         :rtype: NDArray
         """
 
         dt = np.diff(t)
+        tau_fluid = (np.squeeze(G_fluid) * np.squeeze(mu))[:-1]
+        Ap = np.squeeze(self._calcPoreArea(G_eff[:-1]))
+        IH = np.cumsum(self._h * tau_fluid**self._k * Ap * dt)
 
-        IH = np.zeros_like(t)
-        Ap = self._calcPoreArea(G_eff[:-1])
-        IH[1:] = np.cumsum(self._h * tau_fluid[:-1]**self._k * Ap * dt)
+        # insert 0 at beginning
+        IH = np.insert(IH, 0, 0.0)
 
         return IH
     

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from hemtracer.rbc_model import RBCModel
-from hemtracer.hemolysis_model import PowerLawModel
+from hemtracer.hemolysis_model import PowerLawModel, PoreFormationModel
 from hemtracer.pathlines import PathlineCollection
 from typing import List, Dict, Callable
 from numpy.typing import NDArray
@@ -93,27 +93,34 @@ class HemolysisSolver:
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
 
 
-    def compute_hemolysis(self, powerlaw_model: PowerLawModel, visc: float|str = 0.0035) -> None:
+    def compute_hemolysis(self, hemoglobin_model: PowerLawModel|PoreFormationModel, visc: float|str = 0.0035) -> None:
         """
         Computes index of hemolysis along pathlines in percent.
 
-        :param powerlaw_model: Power law model to use for computing index of hemolysis.
-        :type powerlaw_model: PowerLawModel
+        :param hemoglobin_model: Power law model to use for computing index of hemolysis.
+        :type hemoglobin_model: PowerLawModel or PoreFormationModel
         :param visc: Blood viscosity. Defaults to 0.0035 Pa s. If a string is given, it is assumed to be the name of an attribute containing the (local) dynamic viscosity.
         :type visc: float | str
         """
 
-        cell_model_solutions = self._pathlines.get_attribute(powerlaw_model.get_scalar_shear_name())
+        cell_model_solutions = self._pathlines.get_attribute(hemoglobin_model.get_effective_shear_name())
         pathlines = self._pathlines.get_pathlines()
 
-        n_total = len(cell_model_solutions)
+        if isinstance(hemoglobin_model, PoreFormationModel):
+            # fluid_shear = self._pathlines.get_attribute(hemoglobin_model.get_fluid_shear_name())
+            fluid_shear_interp = [pl.get_attribute_interpolator(hemoglobin_model.get_fluid_shear_name()) for pl in pathlines]
+
+        n_total = len(pathlines)
         i=0
 
-        print('Computing ' + powerlaw_model.get_attribute_name() + ' along pathlines')
-        for (sol, pl) in zip(cell_model_solutions, pathlines):
+        print('Computing ' + hemoglobin_model.get_attribute_name() + ' along pathlines')
+        for idx_pl in range(n_total):
+
+            sol = cell_model_solutions[idx_pl]
+            pl = pathlines[idx_pl]
             
             t = sol['t']
-            G = sol['y']
+            Geff = sol['y']
 
             if isinstance(visc, str):
                 mu_interp = pl.get_attribute_interpolator(visc)
@@ -124,9 +131,16 @@ class HemolysisSolver:
             else:
                 mu = visc * np.ones_like(t)
 
-            IH = powerlaw_model.compute_hemolysis(t, G, mu)
+            if isinstance(hemoglobin_model, PoreFormationModel):
+                fluid_shear_i = fluid_shear_interp[idx_pl]
+                if fluid_shear_i is None:
+                    raise AttributeError('No attribute named ' + hemoglobin_model.get_fluid_shear_name() + ' found on pathlines.')
+
+                IH = hemoglobin_model.compute_hemolysis(t, Geff, fluid_shear_i(t), mu)
+            else:
+                IH = hemoglobin_model.compute_hemolysis(t, Geff, mu)
             
-            pl.add_attribute(t, IH, powerlaw_model.get_attribute_name())
+            pl.add_attribute(t, IH, hemoglobin_model.get_attribute_name())
 
             i+=1
             print("...finished " + str(i) + " out of " + str(n_total) + " pathlines.", end='\r')
@@ -144,7 +158,7 @@ class HemolysisSolver:
 
         return self._pathlines.get_attribute(model.get_attribute_name())
     
-    def average_hemolysis(self, model: PowerLawModel, end_criterion_attribute: str | None = None, end_criterion_value: float = 0.0) -> float:
+    def average_hemolysis(self, model: PowerLawModel|PoreFormationModel, end_criterion_attribute: str | None = None, end_criterion_value: float = 0.0) -> float:
         """
         Average hemolysis index over the end points of all pathlines.
 

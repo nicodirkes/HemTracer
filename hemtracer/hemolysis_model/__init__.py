@@ -1,1 +1,1 @@
-from hemtracer.hemolysis_model.hemolysis_model  import IHCorrelation, PowerLawModel
+from hemtracer.hemolysis_model.hemolysis_model  import IHCorrelation, PowerLawModel, PoreFormationCorrelation, PoreFormationModel
