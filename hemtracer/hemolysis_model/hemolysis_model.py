@@ -21,6 +21,15 @@ Named tuple for correlation coefficients. Used in :class:`IHCorrelation`.
 :type beta_Hb: float
 """
 
+PoreFormationCoefficients = namedtuple('PoreFormationCoefficients', ['h', 'k'])
+r"""
+Named tuple for pore formation coefficients. Used in :class:`PoreFormationCorrelation`.
+:param h: Coefficient :math:`h`.
+:type h: float
+:param k: Coefficient :math:`k`.
+:type k: float
+"""
+
 class IHCorrelation(CorrelationCoefficients, Enum):
     r"""
     Represents sets of empirical parameters :math:`(A_\mathrm{Hb}, \alpha_\mathrm{Hb}, \beta_\mathrm{Hb})` for the correlation :math:`IH = A_\mathrm{Hb} \sigma^{\alpha_\mathrm{Hb}} t^{\beta_\mathrm{Hb}}`. Magnitude of :math:`A_{Hb}` is chosen such that :math:`IH` is in percent.
@@ -33,6 +42,12 @@ class IHCorrelation(CorrelationCoefficients, Enum):
     DING_PORCINE = 6.701e-4, 1.0981, 0.2778         #: Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015`
     DING_BOVINE = 9.772e-5, 1.4445, 0.2076          #: Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015`
     GESENHUES_OPTIMIZED = 2.3212e-4, 1.4949, 0.33   #: Gesenhues et al. :cite:p:`gesenhuesStrainBasedBloodDamage2016`
+
+class PoreFormationCorrelation(PoreFormationCoefficients, Enum):
+    r"""
+    Represents sets of empirical parameters :math:`(h, k)` for the pore formation model :math:`\frac{dIH}{dt} = h \sigma^k A_p`, where :math:`A_p` is the pore area.
+    """
+    DING_HUMAN_STRAINBASED = 2.187e-6, 0.927        #: Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015` data fitted to strain-based pore formation model
 
 class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
@@ -232,3 +247,118 @@ class PowerLawModel:
         """
 
         return self._scalar_shear_name
+
+class PoreFormationModel:
+    """Calculates hemolysis based on pore formation mechanism.
+    """
+    def __init__(self, effective_shear: RBCModel | str, fluid_shear: RBCModel | str,
+                 hemolysis_correlation: PoreFormationCorrelation = PoreFormationCorrelation.DING_HUMAN_STRAINBASED, mu: float | str = 3.5e-3) -> None:
+        """
+        Initialization defines all parameters to use. They cannot be changed afterwards.
+
+        :param effective_shear: Model to compute effective shear rate, or name of attribute containing effective shear rate, e.g., 'Geff' if available from an Eulerian simulation.
+        :type effective_shear: RBCModel | str
+        :param fluid_shear: Model to compute fluid shear rate, or name of attribute containing fluid shear rate, e.g., 'Gfluid' if available from an Eulerian simulation.
+        :type fluid_shear: RBCModel | str
+        :param hemolysis_correlation: Hemolysis correlation to use.
+        :type hemolysis_correlation: PoreFormationCorrelation
+        :param mu: Dynamic viscosity of blood. Defaults to 3.5e-3. If a string is given, it is assumed to be the name of an attribute containing the (local) dynamic viscosity.
+        :type mu: float | str
+        """
+
+        if isinstance(effective_shear, RBCModel):
+            self._effective_shear_name = effective_shear.get_attribute_name()
+        else:
+            self._effective_shear_name = effective_shear
+
+        if isinstance(fluid_shear, RBCModel):
+            self._fluid_shear_name = fluid_shear.get_attribute_name()
+        else:
+            self._fluid_shear_name = fluid_shear
+
+        self._corr_name = hemolysis_correlation.name
+
+        self._h = hemolysis_correlation.h
+        self._k = hemolysis_correlation.k
+        self._mu = mu
+
+    def get_name(self) -> str:
+        """
+        Get the name of the pore formation hemolysis model.
+        :return: The name of the pore formation hemolysis model.
+        :rtype: str
+        """
+
+        return self._corr_name + '_PoreFormation'
+    
+    def get_attribute_name(self) -> str:
+        """
+        Get the name of the attribute that will be added to pathlines.
+
+        :return: The name of the attribute that will be added to pathlines.
+        :rtype: str
+        """
+
+        return 'IH_' + self.get_name() + '_' + self._effective_shear_name + '_' + self._fluid_shear_name
+    
+    def get_effective_shear_name(self) -> str:
+        """
+        Get the name of the effective shear rate attribute.
+
+        :return: The name of the effective shear rate attribute.
+        :rtype: str
+        """
+
+        return self._effective_shear_name
+    
+    def get_fluid_shear_name(self) -> str:
+        """
+        Get the name of the fluid shear rate attribute.
+
+        :return: The name of the fluid shear rate attribute.
+        :rtype: str
+        """
+
+        return self._fluid_shear_name
+    
+    def compute_hemolysis(self, t: NDArray, G_eff: NDArray, tau_fluid: NDArray) -> NDArray:
+        """
+        Compute hemolysis along pathline. Called by :class:`HemolysisSolver`.
+
+        :param t: Time steps.
+        :type t: NDArray
+        :param G_eff: Effective scalar shear rate.
+        :type G_eff: NDArray
+        :param G_fluid: Fluid scalar shear rate.
+        :type G_fluid: NDArray
+        :return: Hemolysis index.
+        :rtype: NDArray
+        """
+
+        dt = np.diff(t)
+
+        IH = np.zeros_like(t)
+        Ap = self._calcPoreArea(G_eff[:-1])
+        IH[1:] = np.cumsum(self._h * tau_fluid[:-1]**self._k * Ap * dt)
+
+        return IH
+    
+    def _calcPoreArea(self, G_eff: NDArray) -> NDArray:
+        """
+        Calculate pore area based on effective shear rate.
+
+        :param G_eff: Effective scalar shear rate.
+        :type G_eff: NDArray
+        :return: Pore area.
+        :rtype: NDArray
+        """
+
+        p = [ -13.41, 37.31, -48.91, 32.39, 0.63, -0.16 ]
+        G1 = 3750
+        G2 = 42000
+
+        A_p = np.where(G_eff < G1, np.zeros_like(G_eff), 
+              np.where(G_eff > G2, np.polyval(p, np.ones_like(G_eff)),
+                                   np.polyval(p, G_eff/G2)))
+        
+        return A_p
