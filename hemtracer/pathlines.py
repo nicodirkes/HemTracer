@@ -313,6 +313,7 @@ class PathlineCollection:
         self._velocity_gradient_name = None # The name of the velocity gradient field.
         self._omega_frame_name = None # The name of the angular velocity vector of the frame of reference.
         self._distance_center_name = None # The name of the field for the orthogonal distance to the center of rotation.
+        self._representative_stress_name = None # The name of the scalar representative fluid stress.
 
     def get_pathlines(self) -> List[Pathline]:
         """
@@ -382,6 +383,16 @@ class PathlineCollection:
         """
 
         return self._distance_center_name
+
+    def get_name_representative_stress(self) -> str | None:
+        """
+        Returns the name of the attribute that describes the scalar fluid stress. None if not available.
+
+        :return: The name of the attribute.
+        :rtype: str | None
+        """
+
+        return self._representative_stress_name
     
     def to_file(self, filename: str, attribute_names: List[str] | None = None) -> None:
         """
@@ -560,6 +571,7 @@ class PathlineReader (PathlineCollection):
                     dvY_dx_name: str | None = None, dvY_dy_name: str | None = None, dvY_dz_name: str | None = None,
                     dvZ_dx_name: str | None = None, dvZ_dy_name: str | None = None, dvZ_dz_name: str | None = None,
                     omegaX_name: str | None = None, omegaY_name: str | None = None, omegaZ_name: str | None = None,
+                    representative_stress_name : str | None = None,
                     distance_center_name: str | None = None, idx: List[int] | None = None,
                     gradient_interp: str = 'previous', 
                     sep : str = ',') -> None:
@@ -606,6 +618,8 @@ class PathlineReader (PathlineCollection):
         :type omegaY_name: str | None
         :param omegaZ_name: The name of the attribute containing the z-component of the angular velocity vector of the frame of reference. Defaults to None.
         :type omegaZ_name: str | None
+        :param representative_stress_name: The name of the attribute containing the scalar representative fluid stress. Defaults to None.
+        :type representative_stress_name: str | None
         :param distance_center_name: The name of the attribute containing the orthogonal distance to the center of rotation. Defaults to None.
         :type distance_center_name: str | None
         :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read. Defaults to None.
@@ -641,6 +655,8 @@ class PathlineReader (PathlineCollection):
         if any(vel_grad_names):
             self._velocity_gradient_name = 'VelocityGradient'
 
+        self._representative_stress_name = representative_stress_name
+
         # Determine appropriate reader.
         ext = filename.split('.')[-1]
         match ext:
@@ -650,10 +666,10 @@ class PathlineReader (PathlineCollection):
                 raise ValueError('Unsupported file extension. Supported extensions are .csv')
         
         # Read from file.
-        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, idx, gradient_interp, sep)
+        reader(filename, id_name, t_name, pos_names, vel_names, vel_grad_names, omega_names, distance_center_name, representative_stress_name, idx, gradient_interp, sep)
     
     def _read_csv(self, filename: str, id_name: str, t_name: str, 
-                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, idx: List[int] | None, gradient_interp: str = 'previous', sep: str = ',') -> None:
+                    pos_names: List[str], vel_names: List[str|None], vel_grad_names: List[str|None], omega_names: List[str|None], distance_center_name: str | None, representative_stress_name: str | None, idx: List[int] | None, gradient_interp: str = 'previous', sep: str = ',') -> None:
         """
         Read pathlines from CSV file.
 
@@ -673,6 +689,8 @@ class PathlineReader (PathlineCollection):
         :type omega_names: List[str|None]
         :param distance_center_name: The name of the attribute containing the orthogonal distance to the center of rotation. If None, no distance to center is read.
         :type distance_center_name: str | None
+        :param representative_stress_name: The name of the attribute containing the scalar representative fluid stress. If None, no representative stress is read.
+        :type representative_stress_name: str | None
         :param idx: A list of indices indicating which pathlines to read from file. If None, all pathlines are read.
         :type idx: List[int] | None
         :param gradient_interp: The interpolation scheme to use for the velocity gradient field. Defaults to 'previous'.
@@ -682,7 +700,7 @@ class PathlineReader (PathlineCollection):
         """
 
         # Read from file.
-        pl_data = pd.read_csv(filename, sep=sep, dtype=float)
+        pl_data = pd.read_csv(filename, sep=sep)
         # Find unique pathline IDs.
         pathline_ids = pl_data[id_name].unique()
 
@@ -691,7 +709,7 @@ class PathlineReader (PathlineCollection):
             pathline_ids = pathline_ids[idx]
         
         # Find additional attributes, if available.
-        additional_attributes = [key for key in pl_data.columns if key not in [id_name, t_name] + pos_names + vel_names + vel_grad_names + omega_names + [distance_center_name]]
+        additional_attributes = [key for key in pl_data.columns if key not in [id_name, t_name] + pos_names + vel_names + vel_grad_names + omega_names + [distance_center_name] + [representative_stress_name]]
 
         # Read data.
         for pathline_id in pathline_ids:
@@ -720,6 +738,10 @@ class PathlineReader (PathlineCollection):
             if self._distance_center_name:
                 d = pl_data_id[distance_center_name] if distance_center_name else zeros
                 pl.add_attribute(t, d, self._distance_center_name)
+
+            if self._representative_stress_name:
+                rs = pl_data_id[representative_stress_name] if representative_stress_name else zeros
+                pl.add_attribute(t, rs, self._representative_stress_name)
             
             for attribute in additional_attributes:
                 a = pl_data_id[attribute]
