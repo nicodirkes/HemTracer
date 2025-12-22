@@ -104,6 +104,21 @@ class RBCModel:
         G = 2*np.sqrt(np.abs(self._compute_second_invariant(E)))
 
         return G
+    
+    def _compute_shear_rate_bludszuweit(self, E: Tensor3) -> float:
+        """
+        Compute shear rate from strain tensor using Bludszuweit representative stress.
+        
+        :param E: Strain tensor.
+        :type E: Tensor3
+        :return: Shear rate.
+        :rtype: float
+        """
+
+        G = 2/np.sqrt(3) * np.sqrt(E[0,0]**2 + E[1,1]**2 + E[2,2]**2 - (E[0,0]*E[1,1] + E[1,1]*E[2,2] + E[2,2]*E[0,0]) 
+                                   + 3*(E[0,1]**2 + E[1,0]**2 + E[0,2]**2))
+        
+        return G
 
     def get_name(self) -> str:
         """
