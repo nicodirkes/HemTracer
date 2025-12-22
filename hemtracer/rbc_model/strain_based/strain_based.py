@@ -1030,3 +1030,59 @@ class TankTreadingRotationCorrection(TankTreading):
         Om = Om + self._unpack_antisymmetric(om_correction)
 
         return (E, W, Om)
+    
+class KelvinVoigt(StrainBasedModel):
+    r"""
+    Represents a simple Kelvin-Voigt viscoelastic cell deformation model.
+    """
+
+    def get_name(self) -> str:
+        """
+        Get name of blood damage model.
+
+        :return: Name of the blood damage model.
+        :rtype: str
+        """
+
+        return 'kelvin-voigt'
+    
+    def _initial_condition_undeformed(self) -> NDArray:
+        """
+        Set initial condition for undeformed cells in Kelvin-Voigt model.
+
+        :return: Initial condition for undeformed cells.
+        :rtype: NDArray
+        """
+
+        return np.array([0.0])
+    
+    def _initial_condition_shear(self, G: float) -> NDArray:
+        """
+        Set initial condition for shear rate in Kelvin-Voigt model.
+
+        :param G: Shear rate.
+        :type G: float
+        :return: Initial condition for shear.
+        :rtype: NDArray
+        """
+
+        return np.array([G])
+    
+    def _RHS(self, t: float, y: NDArray) -> NDArray:
+        """
+        Compute the right-hand side of the ODE for the Kelvin-Voigt model.
+
+        :param t: Time.
+        :type t: float
+        :param y: Current state.
+        :type y: NDArray
+        :return: Right-hand side of the ODE.
+        :rtype: NDArray
+        """
+
+        E, W, Om = self._compute_strain_vort_rot(t)  # fluid strain rate tensor
+        Gf = self._compute_shear_rate_bludszuweit(E) # fluid shear rate
+        Geff = y[0]                     # effective shear rate from solution
+        tau = 1.0 / self._coeffs.f1     # characteristic time scale
+
+        return np.array([(Gf - Geff) / tau])
