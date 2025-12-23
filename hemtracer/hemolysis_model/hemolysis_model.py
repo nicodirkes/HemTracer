@@ -45,9 +45,19 @@ class IHCorrelation(CorrelationCoefficients, Enum):
 
 class PoreFormationCorrelation(PoreFormationCoefficients, Enum):
     r"""
-    Represents sets of empirical parameters :math:`(h, k)` for the pore formation model :math:`\frac{dIH}{dt} = h \sigma^k A_p`, where :math:`A_p` is the pore area.
+    Represents sets of empirical parameters :math:`(h, k)` for the pore formation model :math:`\frac{dIH}{dt} = h \sigma^k A_p`, where :math:`A_p` is the pore area. All correlations are based on data from Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015`.
     """
-    DING_HUMAN_STRAINBASED = 2.187e-6, 0.927        #: Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015` data fitted to strain-based pore formation model
+    # Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015` data fitted to strain-based pore formation model
+    DING_HUMAN_STRAINBASED      = 2.187e-6, 0.9289 
+    DING_OVINE_STRAINBASED      = 3.292e-7, 1.4424   
+    DING_PORCINE_STRAINBASED    = 1.556e-6, 1.0268 
+    DING_BOVINE_STRAINBASED     = 4.386e-6, 0.8411  
+
+    # Ding et al. :cite:p:`dingShearInducedHemolysisSpecies2015` data fitted to stress-based pore formation model
+    DING_HUMAN_STRESSBASED      = 1.157e-6, 1.0309   
+    DING_OVINE_STRESSBASED      = 1.816e-7, 1.5399   
+    DING_PORCINE_STRESSBASED    = 8.941e-7, 1.1165 
+    DING_BOVINE_STRESSBASED     = 2.552e-6, 0.9289  
 
 class PowerLawModel:
     r"""A power law hemolysis model is a model that, given a scalar measure for fluid stress (in our case a representative shear rate), predicts the hemolysis index along a pathline. This is done by integrating an experimental correlation for the hemolysis index along the pathline. For details, see :ref:`hemolysis-models`.
