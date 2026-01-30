@@ -582,11 +582,11 @@ class PathlineReader (PathlineCollection):
         :type id_name: str
         :param t_name: The name of the attribute containing the integration times.
         :type t_name: str
-        :param posX_name: The name of the attribute containing the x-coordinates of the pathlines.
+        :param posX_name: The name of the attribute containing the x-coordinates of the pathlines. Defaults to None.
         :type posX_name: str | None
-        :param posY_name: The name of the attribute containing the y-coordinates of the pathlines.
+        :param posY_name: The name of the attribute containing the y-coordinates of the pathlines. Defaults to None.
         :type posY_name: str | None
-        :param posZ_name: The name of the attribute containing the z-coordinates of the pathlines.
+        :param posZ_name: The name of the attribute containing the z-coordinates of the pathlines. Defaults to None.
         :type posZ_name: str | None
         :param velX_name: The name of the attribute containing the x-component of the velocity field. Defaults to None.
         :type velX_name: str | None
