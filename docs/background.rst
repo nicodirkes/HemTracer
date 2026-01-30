@@ -198,13 +198,13 @@ Pore formation model
 
 This model was proposed by Vitale et al. :cite:p:`vitaleMultiscaleBiophysicalModel2014a`. A simplified form was suggested by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026`. It computes the index of hemolysis as
 
-.. math:: \frac{\mathrm d IH}{\mathrm dt} = A_\mathrm{Hb} (\mu G_\mathrm{f})^{k_\mathrm{Hb}} A_\mathrm{pore}(G_s) \, ,
+.. math:: \frac{\mathrm d IH}{\mathrm dt} = h_\mathrm{Hb} (\mu G_\mathrm{f})^{k_\mathrm{Hb}} A_\mathrm{pore}(G_s) \, ,
 
 where :math:`A_\mathrm{pore}` is the pore area, which can be computed as a piecewise polynomial in terms of the shear rate :math:`G_s`. This is implemented as :class:`hemtracer.hemolysis_model.PoreFormationModel`. 
 
 Coefficients
 ^^^^^^^^^^^^^^^^^^^^^^^
-The coefficients :math:`A_\mathrm{Hb}` and :math:`k_\mathrm{Hb}` are determined empirically in a similar fashion as for the power-law model. The parameters presented by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026` are available in :class:`hemtracer.hemolysis_model.PoreFormationCorrelation`.
+The coefficients :math:`h_\mathrm{Hb}` and :math:`k_\mathrm{Hb}` are determined empirically in a similar fashion as for the power-law model. The parameters presented by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026` are available in :class:`hemtracer.hemolysis_model.PoreFormationCorrelation`.
 
 Numerical integration
 ^^^^^^^^^^^^^^^^^^^^^^^
