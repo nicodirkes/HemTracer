@@ -76,6 +76,20 @@ This is implemented as :class:`hemtracer.rbc_model.strain_based.TankTreading`.
 
 Please also note the :ref:`corrigendum`
 
+Kelvin-Voigt model
+^^^^^^^^^^^^^^^^^^
+
+This model represents the simplest strain-based model. It was used by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026` and shown to provide almost equivalent performance to the :ref:`tanktreading-model` in many practical scenarios. The governing equations are
+
+.. math:: 
+    :nowrap:
+
+    \begin{equation}
+    \frac{\mathrm d G_s}{\mathrm dt} = f_1 \left[ G_\mathrm{f} - G_s \right] \, , 
+    \end{equation}
+
+where :math:`G_s` is the resulting scalar shear rate and :math:`G_\mathrm{f}` is the fluid shear rate, computed from the :ref:`bludszuweit-model`.
+
 .. _stress-based-models:
 
 Stress-based models
@@ -138,7 +152,11 @@ This is implemented as :class:`hemtracer.rbc_model.stress_based.SecondInvariant`
 Hemolysis models
 ----------------
 
-Hemolysis models employ an empirical correlation between the scalar shear rate :math:`G_s` and the index of hemolysis :math:`IH \, [\%]`. Commonly, this correlation takes the form of a power law:
+Hemolysis models employ an empirical correlation between the scalar shear rate :math:`G_s` and the index of hemolysis :math:`IH \, [\%]`. 
+
+Power-law model
+~~~~~~~~~~~~~~~~~~~~~
+The most common form of this correlation is a power law:
 
 .. math:: IH = A_\mathrm{Hb} (\mu G_s)^{\alpha_\mathrm{Hb}} t^{\beta_\mathrm{Hb}} \, .
 
@@ -147,13 +165,13 @@ This is implemented as :class:`hemtracer.hemolysis_model.PowerLaw`.
 The parameter :math:`\mu` represents the viscosity of blood. It is usually assumed to be constant and equal to :math:`3.5 \, \mathrm{mPa \cdot \mathrm{s}`. The parameter :math:`t` represents exposure time. It is integrated along the pathline, along with the shear rate :math:`G_s`.
 
 Coefficients
-~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^
 
 The coefficients :math:`A_\mathrm{Hb}`, :math:`\alpha_\mathrm{Hb}` and :math:`\beta_\mathrm{Hb}` are determined empirically. Over the past 30 years, several studies have found a wide range of possible values. The available correlations are given in :class:`hemtracer.hemolysis_model.IHCorrelation`. 
 
 
 Numerical integration
-~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^
 
 The index of hemolysis is computed by numerically integrating the power law along the pathline. There is some discussion in literature on the discretization of the power law. Various approaches are presented by Taskin et al. :cite:p:`taskinEvaluationEulerianLagrangian2012`. Note that they use a different definition of the power law:
 
@@ -174,3 +192,20 @@ They compiled five approaches to integrate this power law. They can be selected 
 +----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`effTime`      | :math:`HI5(t_n) = C (t_\mathrm{eff}^n + (\Delta t)_n)^{\alpha} \sigma^\beta \, , \qquad  t_\mathrm{eff}^n = \left( \frac{HI5(t_{n-1})}{C \sigma^\beta} \right)^{1/\alpha}`        |
 +----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+Pore formation model
+~~~~~~~~~~~~~~~~~~~~~
+
+This model was proposed by Vitale et al. :cite:p:`vitaleMultiscaleBiophysicalModel2014a`. A simplified form was suggested by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026`. It computes the index of hemolysis as
+
+.. math:: \frac{\mathrm d IH}{\mathrm dt} = A_\mathrm{Hb} (\mu G_\mathrm{f})^{k_\mathrm{Hb}} A_\mathrm{pore}(G_s) \, ,
+
+where :math:`A_\mathrm{pore}` is the pore area, which can be computed as a piecewise polynomial in terms of the shear rate :math:`G_s`. This is implemented as :class:`hemtracer.hemolysis_model.PoreFormationModel`. 
+
+Coefficients
+^^^^^^^^^^^^^^^^^^^^^^^
+The coefficients :math:`A_\mathrm{Hb}` and :math:`k_\mathrm{Hb}` are determined empirically in a similar fashion as for the power-law model. The parameters presented by Dirkes and Behr :cite:p:`dirkesPracticalComputationalHemolysis2026` are available in :class:`hemtracer.hemolysis_model.PoreFormationCorrelation`.
+
+Numerical integration
+^^^^^^^^^^^^^^^^^^^^^^^
+Since this model is formulated as a linear ODE, it is straightforward to integrate using any standard ODE solver. There is no ambiguity in the numerical integration as for the power-law model. In this package, we use the options provided by `scipy.integrate.solve_ivp`, with the default method being `RK45`.
