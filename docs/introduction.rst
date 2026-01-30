@@ -19,13 +19,13 @@ Please contact me if you need help with the workflow for unsteady data.
 
 How to cite
 -----------
-More information on the underlying theory can be found in :cite:t:`dirkesEulerianFormulationTensorBased`. If you use this package in your work, please reference this paper.
+More information on the underlying theory can be found in :cite:t:`dirkesEulerianFormulationTensorBased` and :cite:t:`dirkesPracticalComputationalHemolysis2026`. If you use this package in your work, please reference those papers.
 
 .. _corrigendum:
 
 Corrigendum
 -----------
-There is a small mistake in eq. (15) of the above paper. The coefficients :math:`a` and :math:`b` should be defined the other way around, i.e., 
+There is a small mistake in eq. (15) of :cite:t:`dirkesEulerianFormulationTensorBased`. The coefficients :math:`a` and :math:`b` should be defined the other way around, i.e., 
 
 .. math:: a(\boldsymbol{\Lambda}, \mathbf{E}) = \frac{f_2}{2f_3} \frac{\lambda_1 + \lambda_2}{\lambda_1 - \lambda_2} (E_{22} - E_{11}) \, , \qquad b(\boldsymbol{\Lambda}, \mathbf{E}) = \frac{f_2}{f_3} \frac{\lambda_1 + \lambda_2}{\lambda_1 - \lambda_2} E_{12} \, .
 

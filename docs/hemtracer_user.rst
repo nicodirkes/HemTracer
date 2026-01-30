@@ -26,6 +26,10 @@ RBC models
    .. autoclass:: hemtracer.rbc_model.strain_based.TankTreading
       :members:
       :inherited-members:
+
+   .. autoclass:: hemtracer.rbc_model.strain_based.KelvinVoigt
+      :members:
+      :inherited-members:
    
    .. autoclass:: hemtracer.rbc_model.strain_based.TankTreadingRotationCorrection
       :members:
@@ -61,5 +65,12 @@ Hemolysis models
       :class-doc-from: both
    
    .. autoclass:: hemtracer.hemolysis_model.IHCorrelation
+      :class-doc-from: class
+      :members:
+   
+   .. autoclass:: hemtracer.hemolysis_model.PoreFormationModel
+      :class-doc-from: both
+   
+   .. autoclass:: hemtracer.hemolysis_model.PoreFormationCorrelation
       :class-doc-from: class
       :members:
