@@ -565,7 +565,7 @@ class PathlineReader (PathlineCollection):
     """
 
     def __init__(self, filename: str, id_name: str, t_name: str,
-                    posX_name: str, posY_name: str, posZ_name: str,
+                    posX_name:   str | None = None, posY_name:   str | None = None, posZ_name:   str | None = None,
                     velX_name:   str | None = None, velY_name:   str | None = None, velZ_name:   str | None = None,
                     dvX_dx_name: str | None = None, dvX_dy_name: str | None = None, dvX_dz_name: str | None = None,
                     dvY_dx_name: str | None = None, dvY_dy_name: str | None = None, dvY_dz_name: str | None = None,
@@ -583,11 +583,11 @@ class PathlineReader (PathlineCollection):
         :param t_name: The name of the attribute containing the integration times.
         :type t_name: str
         :param posX_name: The name of the attribute containing the x-coordinates of the pathlines.
-        :type posX_name: str
+        :type posX_name: str | None
         :param posY_name: The name of the attribute containing the y-coordinates of the pathlines.
-        :type posY_name: str
+        :type posY_name: str | None
         :param posZ_name: The name of the attribute containing the z-coordinates of the pathlines.
-        :type posZ_name: str
+        :type posZ_name: str | None
         :param velX_name: The name of the attribute containing the x-component of the velocity field. Defaults to None.
         :type velX_name: str | None
         :param velY_name: The name of the attribute containing the y-component of the velocity field. Defaults to None.
